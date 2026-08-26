@@ -72,7 +72,10 @@ int main() {
     exit(EXIT_FAILURE);
   }
  
-  close(server_fd);
+  if (close(server_fd) != 0) {
+    perror("close: server_fd");
+    exit(EXIT_FAILURE);
+  }
 
-  return 0;
+  exit(EXIT_SUCCESS);
 }
