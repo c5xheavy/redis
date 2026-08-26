@@ -53,6 +53,19 @@ int main() {
     return 1;
   }
   std::cout << "Client connected\n";
+
+  const char* pong_msg = "+PONG\r\n";
+  size_t pong_msg_len = strlen(pong_msg);
+
+  size_t bytes_left = pong_msg_len;
+  while (bytes_left > 0) {
+    int bytes_send = send(client_fd, pong_msg + pong_msg_len - bytes_left, bytes_left, 0);
+    if (bytes_send == -1) {
+      perror("send");
+      return 1;
+    }
+    bytes_left -= bytes_send;
+  }
  
   close(server_fd);
 
