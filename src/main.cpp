@@ -62,7 +62,7 @@ int main() {
   size_t pong_msg_len = strlen(pong_msg);
 
   while ((bytes_recv = recv(client_fd, recv_buf, recv_buf_len, 0)) > 0) {
-    int bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
+    ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
     if (bytes_send < 0) {
       perror("send");
       return 1;
