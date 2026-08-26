@@ -55,13 +55,12 @@ int main() {
   std::cout << "Client connected\n";
 
   char recv_buf[1024];
-  size_t recv_buf_len = 1024;
   ssize_t bytes_recv;
 
   const char* pong_msg = "+PONG\r\n";
   size_t pong_msg_len = strlen(pong_msg);
 
-  while ((bytes_recv = recv(client_fd, recv_buf, recv_buf_len, 0)) > 0) {
+  while ((bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0)) > 0) {
     ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
     if (bytes_send < 0) {
       perror("send");
