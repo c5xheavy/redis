@@ -16,7 +16,7 @@ int main() {
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     perror("socket");
-    return 1;
+    exit(EXIT_FAILURE);
   }
   
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -24,7 +24,7 @@ int main() {
   int reuse = 1;
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
     perror("setsockopt");
-    return 1;
+    exit(EXIT_FAILURE);
   }
   
   struct sockaddr_in server_addr;
@@ -34,13 +34,13 @@ int main() {
   
   if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
     perror("bind");
-    return 1;
+    exit(EXIT_FAILURE);
   }
   
   int connection_backlog = 5;
   if (listen(server_fd, connection_backlog) != 0) {
     perror("listen");
-    return 1;
+    exit(EXIT_FAILURE);
   }
   
   struct sockaddr_in client_addr;
@@ -50,7 +50,7 @@ int main() {
   int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
   if (client_fd == -1) {
     perror("accept");
-    return 1;
+    exit(EXIT_FAILURE);
   }
   std::cout << "Client connected\n";
 
@@ -64,12 +64,12 @@ int main() {
     ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
     if (bytes_send < 0) {
       perror("send");
-      return 1;
+      exit(EXIT_FAILURE);
     }
   }
   if (bytes_recv < 0) {
     perror("recv");
-    return 1;
+    exit(EXIT_FAILURE);
   }
  
   close(server_fd);
