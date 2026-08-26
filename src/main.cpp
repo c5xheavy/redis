@@ -54,17 +54,23 @@ int main() {
   }
   std::cout << "Client connected\n";
 
+  char read_buf[1024];
+  size_t read_buf_len = 1024;
+  ssize_t bytes_read;
+
   const char* pong_msg = "+PONG\r\n";
   size_t pong_msg_len = strlen(pong_msg);
 
-  size_t bytes_left = pong_msg_len;
-  while (bytes_left > 0) {
-    int bytes_send = send(client_fd, pong_msg + pong_msg_len - bytes_left, bytes_left, 0);
-    if (bytes_send == -1) {
+  while ((bytes_read = read(client_fd, read_buf, read_buf_len)) > 0) {
+    int bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
+    if (bytes_send < 0) {
       perror("send");
       return 1;
     }
-    bytes_left -= bytes_send;
+  }
+  if (bytes_read < 0) {
+    perror("read");
+    return 1;
   }
  
   close(server_fd);
