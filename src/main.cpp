@@ -74,7 +74,10 @@ int main() {
   int client_addr_len = sizeof(client_addr);
 
   while (true) {
-    int nfds = epoll_wait(epoll_fd, events, max_events, -1);
+    int nfds;
+    do {
+      nfds = epoll_wait(epoll_fd, events, max_events, -1);
+    } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       perror("epoll_wait");
       exit(EXIT_FAILURE);
