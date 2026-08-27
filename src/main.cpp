@@ -13,6 +13,15 @@
 
 constexpr size_t max_events = 10;
 
+int close_client(int client_fd) {
+  int rv = close(client_fd);
+  if (rv != 0) {
+    perror("close: client_fd");
+    exit(EXIT_FAILURE);
+  }
+  return rv;
+}
+
 int main() {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -125,10 +134,7 @@ int main() {
           exit(EXIT_FAILURE);
         }
         if (bytes_recv == 0) {
-          if (close(client_fd) != 0) {
-            perror("close: client_fd");
-            exit(EXIT_FAILURE);
-          }
+          close_client(client_fd);
           std::cout << "Client closed connection\n";
         }
       }
