@@ -121,7 +121,10 @@ int main() {
         size_t pong_msg_len = strlen(pong_msg);
 
         int client_fd = events[i].data.fd;
-        ssize_t bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
+        ssize_t bytes_recv;
+        do {
+          bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
+        } while (bytes_recv < 0 && errno == EINTR);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           close_client(client_fd);
           std::cout << "Closing client after failed recv\n";
@@ -132,7 +135,10 @@ int main() {
           std::cout << "Client closed connection\n";
           continue;
         }
-        ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
+        ssize_t bytes_send;
+        do {
+          bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
+        } while (bytes_send < 0 && errno == EINTR);
         if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           close_client(client_fd);
           std::cout << "Closing client after failed send\n";
