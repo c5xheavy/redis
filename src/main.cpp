@@ -10,8 +10,21 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <deque>
 
 constexpr size_t max_events = 10;
+
+struct connection {
+  int client_fd;
+  std::deque<char> input_buffer;
+  std::deque<char> output_buffer;
+};
+
+connection* create_connection(int client_fd) {
+  connection* conn = new connection{};
+  conn->client_fd = client_fd;
+  return conn;
+}
 
 int close_client(int client_fd) {
   int rv = close(client_fd);
@@ -19,6 +32,12 @@ int close_client(int client_fd) {
     perror("close: client_fd");
     exit(EXIT_FAILURE);
   }
+  return rv;
+}
+
+int close_connection(connection* conn) {
+  int rv = close_client(conn->client_fd);
+  delete conn;
   return rv;
 }
 
@@ -73,8 +92,8 @@ int main() {
   }
 
   ev.events = EPOLLIN;
-  ev.data.fd = server_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, ev.data.fd, &ev) != 0) {
+  ev.data.ptr = &server_fd;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev) != 0) {
     perror("epoll_ctl: server_fd");
     exit(EXIT_FAILURE);
   }
@@ -93,7 +112,7 @@ int main() {
     }
 
     for (int i = 0; i < nfds; ++i) {
-      if (events[i].data.fd == server_fd) {
+      if (*static_cast<int*>(events[i].data.ptr) == server_fd) {
         std::cout << "Connecting client...\n";
         int client_fd;
         do {
@@ -109,8 +128,8 @@ int main() {
         std::cout << "Client connected\n";
 
         ev.events = EPOLLIN;
-        ev.data.fd = client_fd;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, ev.data.fd, &ev)) {
+        ev.data.ptr = create_connection(client_fd);
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, static_cast<connection*>(ev.data.ptr)->client_fd, &ev)) {
           perror("epoll_ctl: client_fd");
           exit(EXIT_FAILURE);
         }
@@ -120,18 +139,19 @@ int main() {
         const char* pong_msg = "+PONG\r\n";
         size_t pong_msg_len = strlen(pong_msg);
 
-        int client_fd = events[i].data.fd;
+        connection* conn = static_cast<connection*>(events[i].data.ptr);
+        int client_fd = conn->client_fd;
         ssize_t bytes_recv;
         do {
           bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
         } while (bytes_recv < 0 && errno == EINTR);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close_client(client_fd);
+          close_connection(conn);
           std::cout << "Closing client after failed recv\n";
           continue;
         }
         if (bytes_recv == 0) {
-          close_client(client_fd);
+          close_connection(conn);
           std::cout << "Client closed connection\n";
           continue;
         }
@@ -140,7 +160,7 @@ int main() {
           bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
         } while (bytes_send < 0 && errno == EINTR);
         if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close_client(client_fd);
+          close_connection(conn);
           std::cout << "Closing client after failed send\n";
         }
       }
