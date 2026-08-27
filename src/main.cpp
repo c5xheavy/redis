@@ -116,26 +116,26 @@ int main() {
         }
       } else {
         char recv_buf[1024];
-        ssize_t bytes_recv;
 
         const char* pong_msg = "+PONG\r\n";
         size_t pong_msg_len = strlen(pong_msg);
 
         int client_fd = events[i].data.fd;
-        while ((bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0)) > 0) {
-          ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
-          if (bytes_send < 0) {
-            perror("send");
-            exit(EXIT_FAILURE);
-          }
-        }
+        ssize_t bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          perror("recv");
-          exit(EXIT_FAILURE);
+          close_client(client_fd);
+          std::cout << "Closing client after failed recv\n";
+          continue;
         }
         if (bytes_recv == 0) {
           close_client(client_fd);
           std::cout << "Client closed connection\n";
+          continue;
+        }
+        ssize_t bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
+        if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+          close_client(client_fd);
+          std::cout << "Closing client after failed send\n";
         }
       }
     }
