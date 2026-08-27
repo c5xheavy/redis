@@ -4,6 +4,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -16,6 +17,8 @@ int main() {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
+
+  signal(SIGPIPE, SIG_IGN);
 
   epoll_event ev, events[max_events];
 
