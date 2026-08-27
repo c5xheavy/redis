@@ -90,9 +90,12 @@ int main() {
         do {
           client_fd = accept4(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len, SOCK_NONBLOCK);
         } while (client_fd < 0 && errno == EINTR);
-        if (client_fd == -1) {
+        if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           perror("accept");
           exit(EXIT_FAILURE);
+        }
+        if (client_fd < 0) {
+          continue;
         }
         std::cout << "Client connected\n";
 
