@@ -21,6 +21,12 @@ set -e # Exit early if any commands fail
     cmake -B build -S .
   fi
   cmake --build ./build
+
+  # Local-only instrumented builds (see CMakeLists.txt). All of them must compile —
+  # -Werror lives there — before the plain build below is run.
+  cmake -B build-asan    -S . -DCMAKE_BUILD_TYPE=Asan    >/dev/null && cmake --build build-asan
+  cmake -B build-tsan    -S . -DCMAKE_BUILD_TYPE=Tsan    >/dev/null && cmake --build build-tsan
+  cmake -B build-release -S . -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build build-release
 )
 
 # Copied from .codecrafters/run.sh
