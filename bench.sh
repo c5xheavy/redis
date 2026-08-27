@@ -21,7 +21,7 @@ git diff --quiet HEAD -- src CMakeLists.txt || HASH="$HASH+dirty"
 DATE=$(date '+%Y-%m-%d %H:%M')
 
 # Commit of the previous entry, to show how much changed since then.
-PREV=$( { grep -oE '^\| [0-9-]+ [0-9:]+ \| [0-9a-f]{7,}' "$LOG" 2>/dev/null || true; } | tail -1 | awk '{print $4}')
+PREV=$( { grep -oE '^\| [0-9-]+ [0-9:]+ \| [0-9a-f]{7,}' "$LOG" 2>/dev/null || true; } | tail -1 | awk '{print $5}')
 SINCE=""
 if [ -n "$PREV" ] && git cat-file -e "$PREV" 2>/dev/null; then
   SINCE="; since $PREV: $(git rev-list --count "$PREV..HEAD") commits"
