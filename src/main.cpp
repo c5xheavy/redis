@@ -11,20 +11,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <deque>
+#include <map>
 
 constexpr size_t max_events = 10;
-
-struct connection {
-  int client_fd;
-  std::deque<char> input_buffer;
-  std::deque<char> output_buffer;
-};
-
-connection* create_connection(int client_fd) {
-  connection* conn = new connection{};
-  conn->client_fd = client_fd;
-  return conn;
-}
 
 int close_client(int client_fd) {
   int rv = close(client_fd);
@@ -35,11 +24,25 @@ int close_client(int client_fd) {
   return rv;
 }
 
-int close_connection(connection* conn) {
-  int rv = close_client(conn->client_fd);
-  delete conn;
-  return rv;
-}
+class connection {
+public:
+  explicit connection(int client_fd) : _client_fd{client_fd} {}
+
+  ~connection() {
+    close_client(_client_fd);
+  }
+
+  connection(const connection&) = delete;
+  connection& operator=(const connection&) = delete;
+
+  connection(connection&&) = default;
+  connection& operator=(connection&&) = default;
+
+private:
+  int _client_fd;
+  std::deque<char> _input_buffer;
+  std::deque<char> _output_buffer;
+};
 
 int main() {
   // Flush after every std::cout / std::cerr
@@ -48,6 +51,7 @@ int main() {
 
   signal(SIGPIPE, SIG_IGN);
 
+  std::map<int, connection> connections;
   epoll_event ev, events[max_events];
 
   int epoll_fd = epoll_create1(0);
@@ -92,7 +96,7 @@ int main() {
   }
 
   ev.events = EPOLLIN;
-  ev.data.ptr = &server_fd;
+  ev.data.fd = server_fd;
   if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev) != 0) {
     perror("epoll_ctl: server_fd");
     exit(EXIT_FAILURE);
@@ -112,7 +116,7 @@ int main() {
     }
 
     for (int i = 0; i < nfds; ++i) {
-      if (*static_cast<int*>(events[i].data.ptr) == server_fd) {
+      if (events[i].data.fd == server_fd) {
         std::cout << "Connecting client...\n";
         int client_fd;
         do {
@@ -127,9 +131,10 @@ int main() {
         }
         std::cout << "Client connected\n";
 
+        connections.emplace(client_fd, client_fd); // (int, connection(int))
         ev.events = EPOLLIN;
-        ev.data.ptr = create_connection(client_fd);
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, static_cast<connection*>(ev.data.ptr)->client_fd, &ev)) {
+        ev.data.fd = client_fd;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev)) {
           perror("epoll_ctl: client_fd");
           exit(EXIT_FAILURE);
         }
@@ -139,20 +144,19 @@ int main() {
         const char* pong_msg = "+PONG\r\n";
         size_t pong_msg_len = strlen(pong_msg);
 
-        connection* conn = static_cast<connection*>(events[i].data.ptr);
-        int client_fd = conn->client_fd;
+        int client_fd = events[i].data.fd;
         ssize_t bytes_recv;
         do {
           bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
         } while (bytes_recv < 0 && errno == EINTR);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close_connection(conn);
           std::cout << "Closing client " << client_fd << " after failed recv\n";
+          connections.erase(client_fd);
           continue;
         }
         if (bytes_recv == 0) {
-          close_connection(conn);
           std::cout << "Client " << client_fd << " closed connection\n";
+          connections.erase(client_fd);
           continue;
         }
         ssize_t bytes_send;
@@ -160,8 +164,8 @@ int main() {
           bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
         } while (bytes_send < 0 && errno == EINTR);
         if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close_connection(conn);
           std::cout << "Closing client " << client_fd << " after failed send\n";
+          connections.erase(client_fd);
         }
       }
     }
