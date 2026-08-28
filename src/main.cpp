@@ -147,12 +147,12 @@ int main() {
         } while (bytes_recv < 0 && errno == EINTR);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           close_connection(conn);
-          std::cout << "Closing client after failed recv\n";
+          std::cout << "Closing client " << client_fd << " after failed recv\n";
           continue;
         }
         if (bytes_recv == 0) {
           close_connection(conn);
-          std::cout << "Client closed connection\n";
+          std::cout << "Client " << client_fd << " closed connection\n";
           continue;
         }
         ssize_t bytes_send;
@@ -161,7 +161,7 @@ int main() {
         } while (bytes_send < 0 && errno == EINTR);
         if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           close_connection(conn);
-          std::cout << "Closing client after failed send\n";
+          std::cout << "Closing client " << client_fd << " after failed send\n";
         }
       }
     }
