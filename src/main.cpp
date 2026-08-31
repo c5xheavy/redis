@@ -35,7 +35,7 @@ private:
 
     unique_fd(unique_fd&& other) noexcept : _fd{std::exchange(other._fd, -1)} {}
 
-    unique_fd& operator=(unique_fd&& other) noexcept {
+    auto operator=(unique_fd&& other) noexcept -> unique_fd& {
       if (this == &other) {
         return *this;
       }
@@ -47,7 +47,7 @@ private:
     }
 
     unique_fd(const unique_fd&) = delete;
-    unique_fd& operator=(const unique_fd&) = delete;
+    auto operator=(const unique_fd&) -> unique_fd& = delete;
 
   private:
     void close_fd() noexcept {
@@ -67,10 +67,10 @@ public:
   ~connection() = default;
 
   connection(connection&&) noexcept = default;
-  connection& operator=(connection&&) noexcept = default;
+  auto operator=(connection&&) noexcept -> connection& = default;
 
   connection(const connection&) = delete;
-  connection& operator=(const connection&) = delete;
+  auto operator=(const connection&) -> connection& = delete;
 
 private:
   unique_fd _client_fd;
@@ -81,7 +81,7 @@ private:
 static_assert(std::is_nothrow_move_constructible_v<connection>);
 static_assert(std::is_nothrow_move_assignable_v<connection>);
 
-int main() {
+auto main() -> int {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
