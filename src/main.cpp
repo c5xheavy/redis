@@ -117,12 +117,13 @@ auto main() -> int {
     exit(EXIT_FAILURE);
   }
   
-  struct sockaddr_in server_addr;
+  struct sockaddr_in server_addr{};
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(redis_port);
   
-  if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+  if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
     perror("bind");
     exit(EXIT_FAILURE);
   }
@@ -140,8 +141,8 @@ auto main() -> int {
     exit(EXIT_FAILURE);
   }
   
-  struct sockaddr_in client_addr;
-  int client_addr_len = sizeof(client_addr);
+  struct sockaddr_in client_addr{};
+  socklen_t client_addr_len = sizeof(client_addr);
 
   while (true) {
     int nfds;
@@ -158,7 +159,8 @@ auto main() -> int {
         std::cout << "Connecting client...\n";
         int client_fd;
         do {
-          client_fd = accept4(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len, SOCK_NONBLOCK);
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+          client_fd = accept4(server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
         } while (client_fd < 0 && errno == EINTR);
         if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           perror("accept");
