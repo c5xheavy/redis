@@ -1,19 +1,20 @@
-#include <iostream>
-#include <cstdlib>
-#include <string>
-#include <cstring>
-#include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <sys/epoll.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <deque>
-#include <map>
-#include <utility>
+#include <array>
 #include <cassert>
+#include <cerrno>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <fcntl.h>
+#include <iostream>
+#include <map>
+#include <netinet/in.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <type_traits>
+#include <unistd.h>
+#include <utility>
 
 constexpr size_t max_events = 10;
 
