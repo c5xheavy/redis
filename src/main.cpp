@@ -18,6 +18,7 @@
 
 constexpr size_t redis_port = 6379;
 constexpr size_t max_events = 10;
+constexpr size_t recv_buf_max_size = 1024;
 
 class connection {
 private:
@@ -81,7 +82,8 @@ int main() {
   signal(SIGPIPE, SIG_IGN);
 
   std::map<int, connection> connections;
-  epoll_event ev, events[max_events];
+  epoll_event ev{};
+  std::array<epoll_event, max_events> events{};
 
   int epoll_fd = epoll_create1(0);
   if (epoll_fd < 0) {
@@ -137,7 +139,7 @@ int main() {
   while (true) {
     int nfds;
     do {
-      nfds = epoll_wait(epoll_fd, events, max_events, -1);
+      nfds = epoll_wait(epoll_fd, events.data(), max_events, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       perror("epoll_wait");
@@ -145,7 +147,7 @@ int main() {
     }
 
     for (int i = 0; i < nfds; ++i) {
-      if (events[i].data.fd == server_fd) {
+      if (events.at(i).data.fd == server_fd) {
         std::cout << "Connecting client...\n";
         int client_fd;
         do {
@@ -169,15 +171,15 @@ int main() {
           exit(EXIT_FAILURE);
         }
       } else {
-        char recv_buf[1024];
+        std::array<char, recv_buf_max_size> recv_buf{};
 
         const char* pong_msg = "+PONG\r\n";
         size_t pong_msg_len = strlen(pong_msg);
 
-        int client_fd = events[i].data.fd;
+        int client_fd = events.at(i).data.fd;
         ssize_t bytes_recv;
         do {
-          bytes_recv = recv(client_fd, recv_buf, sizeof(recv_buf), 0);
+          bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
         } while (bytes_recv < 0 && errno == EINTR);
         if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
           std::cout << "Closing client " << client_fd << " after failed recv\n";
