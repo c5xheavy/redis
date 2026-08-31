@@ -12,34 +12,57 @@
 #include <netdb.h>
 #include <deque>
 #include <map>
+#include <utility>
 
 constexpr size_t max_events = 10;
 
-int close_client(int client_fd) {
-  int rv = close(client_fd);
-  if (rv != 0) {
-    perror("close: client_fd");
-    exit(EXIT_FAILURE);
-  }
-  return rv;
-}
-
 class connection {
+private:
+  class unique_fd {
+  public:
+    explicit unique_fd(int fd) : _fd{fd} {}
+
+    ~unique_fd() {
+      if (_fd == -1) return;
+      close_fd();
+    }
+
+    unique_fd(unique_fd&& other) noexcept : _fd{std::exchange(other._fd, -1)} {}
+
+    unique_fd& operator=(unique_fd&& other) noexcept {
+      if (this == &other) return *this;
+      if (_fd != -1) close_fd();
+      _fd = std::exchange(other._fd, -1);
+      return *this;
+    }
+
+    unique_fd(const unique_fd&) = delete;
+    unique_fd& operator=(const unique_fd&) = delete;
+
+  private:
+    void close_fd() noexcept {
+      if (close(_fd) != 0 && errno != EINTR) {
+        perror("close: unique_fd");
+        abort();
+      }
+    }
+
+    int _fd;
+  };
+
 public:
   explicit connection(int client_fd) : _client_fd{client_fd} {}
 
-  ~connection() {
-    close_client(_client_fd);
-  }
+  ~connection() = default;
+
+  connection(connection&&) noexcept = default;
+  connection& operator=(connection&&) noexcept = default;
 
   connection(const connection&) = delete;
   connection& operator=(const connection&) = delete;
 
-  connection(connection&&) = default;
-  connection& operator=(connection&&) = default;
-
 private:
-  int _client_fd;
+  unique_fd _client_fd;
   std::deque<char> _input_buffer;
   std::deque<char> _output_buffer;
 };
