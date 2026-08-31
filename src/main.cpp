@@ -55,6 +55,7 @@ private:
         perror("close: unique_fd");
         std::abort();
       }
+      _fd = -1;
     }
 
     int _fd;
