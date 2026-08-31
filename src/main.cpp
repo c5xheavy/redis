@@ -86,7 +86,8 @@ auto main() -> int {
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  signal(SIGPIPE, SIG_IGN);
+  // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
+  (void)signal(SIGPIPE, SIG_IGN);
 
   std::map<int, connection> connections;
   epoll_event ev{};
@@ -104,6 +105,7 @@ auto main() -> int {
     exit(EXIT_FAILURE);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
   if (fcntl(server_fd, F_SETFL, O_NONBLOCK) != 0) {
     perror("fcntl");
     exit(EXIT_FAILURE);
@@ -112,6 +114,7 @@ auto main() -> int {
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
   // ensures that we don't run into 'Address already in use' errors
   int reuse = 1;
+  // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
     perror("setsockopt");
     exit(EXIT_FAILURE);
