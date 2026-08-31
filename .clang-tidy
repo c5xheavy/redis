@@ -1,0 +1,50 @@
+---
+# Maximum strictness: everything on, opt-out per check with a written reason.
+# Run: clang-tidy -p build src/main.cpp
+#
+# Excluded entirely: packs that are other projects'/platforms' house rules,
+# not strictness (Objective-C, Android, FPGA, Fuchsia, llvm-libc, Zircon,
+# Abseil-internal, Darwin, MPI, OpenMP, Linux-kernel).
+#
+# Note: cert-*/hicpp-* are largely aliases of bugprone-*/cppcoreguidelines-*,
+# so one defect can be reported under several names.
+#
+# Per-check opt-outs (each with a reason):
+#   concurrency-mt-unsafe - fires on every exit(); re-enable when I/O threads appear
+#   readability-function-cognitive-complexity - re-enable after refactoring
+#   readability-identifier-length - I like my 2 letter names vars
+#   avoid-do-while - I like my do-whiles
+#   -cppcoreguidelines-avoid-do-while - I like my do-whiles
+Checks: >
+  *,
+  -objc-*,
+  -android-*,
+  -altera-*,
+  -fuchsia-*,
+  -llvmlibc-*,
+  -zircon-*,
+  -abseil-*,
+  -darwin-*,
+  -mpi-*,
+  -openmp-*,
+  -linuxkernel-*,
+  -concurrency-mt-unsafe,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -avoid-do-while,
+  -cppcoreguidelines-avoid-do-while
+CheckOptions:
+  # Default is false, and with false `assert(map.try_emplace(...).second)` is NOT flagged.
+  bugprone-assert-side-effect.CheckFunctionCalls: true
+  # Every check that has a StrictMode, explicitly on. Full catalogue of tuning
+  # knobs: `clang-tidy --dump-config` (lenience is spelled Allow*/Ignore*/Skip*).
+  # Deliberately left at default: cert-err33-c.AllowCastToVoid — `(void)f()` is a
+  # recorded decision to discard a result, not a hole.
+  bugprone-argument-comment.StrictMode: true
+  bugprone-suspicious-enum-usage.StrictMode: true
+  cppcoreguidelines-pro-type-const-cast.StrictMode: true
+  cppcoreguidelines-pro-type-static-cast-downcast.StrictMode: true
+  misc-unused-parameters.StrictMode: true
+  modernize-use-std-print.StrictMode: true
+  performance-inefficient-string-concatenation.StrictMode: true
+  readability-avoid-return-with-void-value.StrictMode: true
