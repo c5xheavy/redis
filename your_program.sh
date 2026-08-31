@@ -16,9 +16,9 @@ set -e # Exit early if any commands fail
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
   # No vcpkg dependencies are used; only pass the toolchain if vcpkg is actually installed
   if [ -n "${VCPKG_ROOT}" ]; then
-    cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
+    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
   else
-    cmake -B build -S .
+    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
   fi
   cmake --build ./build
 
