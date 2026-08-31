@@ -92,13 +92,13 @@ auto main() -> int {
   epoll_event ev{};
   std::array<epoll_event, max_events> events{};
 
-  int epoll_fd = epoll_create1(0);
+  const int epoll_fd = epoll_create1(0);
   if (epoll_fd < 0) {
     perror("epoll_create1");
     exit(EXIT_FAILURE);
   }
   
-  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+  const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     perror("socket");
     exit(EXIT_FAILURE);
@@ -128,7 +128,7 @@ auto main() -> int {
     exit(EXIT_FAILURE);
   }
   
-  int connection_backlog = 5;
+  const int connection_backlog = 5;
   if (listen(server_fd, connection_backlog) != 0) {
     perror("listen");
     exit(EXIT_FAILURE);
@@ -145,7 +145,7 @@ auto main() -> int {
   socklen_t client_addr_len = sizeof(client_addr);
 
   while (true) {
-    int nfds;
+    int nfds = 0;
     do {
       nfds = epoll_wait(epoll_fd, events.data(), max_events, -1);
     } while (nfds < 0 && errno == EINTR);
@@ -157,7 +157,7 @@ auto main() -> int {
     for (int i = 0; i < nfds; ++i) {
       if (events.at(i).data.fd == server_fd) {
         std::cout << "Connecting client...\n";
-        int client_fd;
+        int client_fd = -1;
         do {
           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
           client_fd = accept4(server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
@@ -183,10 +183,10 @@ auto main() -> int {
         std::array<char, recv_buf_max_size> recv_buf{};
 
         const char* pong_msg = "+PONG\r\n";
-        size_t pong_msg_len = strlen(pong_msg);
+        const size_t pong_msg_len = strlen(pong_msg);
 
-        int client_fd = events.at(i).data.fd;
-        ssize_t bytes_recv;
+        const int client_fd = events.at(i).data.fd;
+        ssize_t bytes_recv = -1;
         do {
           bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
         } while (bytes_recv < 0 && errno == EINTR);
@@ -200,7 +200,7 @@ auto main() -> int {
           connections.erase(client_fd);
           continue;
         }
-        ssize_t bytes_send;
+        ssize_t bytes_send = -1;
         do {
           bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
         } while (bytes_send < 0 && errno == EINTR);
