@@ -8,17 +8,21 @@
 
 set -e # Exit early if any commands fail
 
+step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
+
 # Copied from .codecrafters/compile.sh
 #
 # - Edit this to change how your program compiles locally
 # - Edit .codecrafters/compile.sh to change how your program compiles remotely
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
+
+  step "[1/2] build: build, build-asan, build-tsan, build-release"
   # No vcpkg dependencies are used; only pass the toolchain if vcpkg is actually installed
   if [ -n "${VCPKG_ROOT}" ]; then
-    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
+    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake >/dev/null
   else
-    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
   fi
   cmake --build ./build
 
@@ -29,6 +33,7 @@ set -e # Exit early if any commands fail
   cmake -B build-release -S . -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build build-release
 )
 
+step "[2/2] run: build/redis $*"
 # Copied from .codecrafters/run.sh
 #
 # - Edit this to change how your program runs locally
