@@ -53,7 +53,7 @@ private:
     void close_fd() noexcept {
       if (close(_fd) != 0 && errno != EINTR) {
         perror("close: unique_fd");
-        abort();
+        std::abort();
       }
     }
 
