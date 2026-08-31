@@ -175,7 +175,7 @@ auto main() -> int {
         assert(try_emplace_rv.second);
         ev.events = EPOLLIN;
         ev.data.fd = client_fd;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev)) {
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) != 0) {
           perror("epoll_ctl: client_fd");
           exit(EXIT_FAILURE);
         }
