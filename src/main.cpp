@@ -67,6 +67,9 @@ private:
   std::deque<char> _output_buffer;
 };
 
+static_assert(std::is_nothrow_move_constructible_v<connection>);
+static_assert(std::is_nothrow_move_assignable_v<connection>);
+
 int main() {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
