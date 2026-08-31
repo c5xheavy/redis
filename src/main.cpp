@@ -13,6 +13,7 @@
 #include <deque>
 #include <map>
 #include <utility>
+#include <cassert>
 
 constexpr size_t max_events = 10;
 
@@ -157,7 +158,8 @@ int main() {
         }
         std::cout << "Client connected\n";
 
-        connections.emplace(client_fd, client_fd); // (int, connection(int))
+        auto try_emplace_rv = connections.try_emplace(client_fd, client_fd); // (int, connection(int))
+        assert(try_emplace_rv.second);
         ev.events = EPOLLIN;
         ev.data.fd = client_fd;
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev)) {
