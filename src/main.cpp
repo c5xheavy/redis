@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <utility>
 
+constexpr size_t redis_port = 6379;
 constexpr size_t max_events = 10;
 
 class connection {
@@ -110,7 +111,7 @@ int main() {
   struct sockaddr_in server_addr;
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(6379);
+  server_addr.sin_port = htons(redis_port);
   
   if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
     perror("bind");
