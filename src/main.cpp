@@ -239,6 +239,7 @@ int main() {
         const size_t pong_msg_len = strlen(pong_msg);
 
         const int client_fd = events.at(i).data.fd;
+
         ssize_t bytes_recv = -1;
         do {
           bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
@@ -253,6 +254,8 @@ int main() {
           connections.erase(client_fd);
           continue;
         }
+        connections.at(client_fd).append(recv_buf, bytes_recv);
+
         ssize_t bytes_send = -1;
         do {
           bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
