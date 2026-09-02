@@ -15,6 +15,9 @@
 #   readability-identifier-length - I like my 2 letter names vars
 #   avoid-do-while - I like my do-whiles
 #   -cppcoreguidelines-avoid-do-while - I like my do-whiles
+#   modernize-use-trailing-return-type - leading return type is the dominant industry style
+#     (LLVM, Chromium, Google); trailing stays where it is required (return type
+#     depends on parameters)
 Checks: >
   *,
   -objc-*,
@@ -32,7 +35,8 @@ Checks: >
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
   -avoid-do-while,
-  -cppcoreguidelines-avoid-do-while
+  -cppcoreguidelines-avoid-do-while,
+  -modernize-use-trailing-return-type
 CheckOptions:
   # Default is false, and with false `assert(map.try_emplace(...).second)` is NOT flagged.
   bugprone-assert-side-effect.CheckFunctionCalls: true
