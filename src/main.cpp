@@ -16,9 +16,9 @@
 #include <unistd.h>
 #include <utility>
 
-constexpr size_t redis_port = 6379;
-constexpr size_t max_events = 10;
-constexpr size_t recv_buf_max_size = 1024;
+constexpr size_t REDIS_PORT = 6379;
+constexpr size_t MAX_EVENTS = 10;
+constexpr size_t RECV_BUF_MAX_SIZE = 1024;
 
 class connection {
 private:
@@ -91,7 +91,7 @@ int main() {
 
   std::map<int, connection> connections;
   epoll_event ev{};
-  std::array<epoll_event, max_events> events{};
+  std::array<epoll_event, MAX_EVENTS> events{};
 
   const int epoll_fd = epoll_create1(0);
   if (epoll_fd < 0) {
@@ -123,7 +123,7 @@ int main() {
   struct sockaddr_in server_addr{};
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(redis_port);
+  server_addr.sin_port = htons(REDIS_PORT);
   
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
   if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
@@ -150,7 +150,7 @@ int main() {
   while (true) {
     int nfds = 0;
     do {
-      nfds = epoll_wait(epoll_fd, events.data(), max_events, -1);
+      nfds = epoll_wait(epoll_fd, events.data(), MAX_EVENTS, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       perror("epoll_wait");
@@ -183,7 +183,7 @@ int main() {
           exit(EXIT_FAILURE);
         }
       } else {
-        std::array<char, recv_buf_max_size> recv_buf{};
+        std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
 
         const char* pong_msg = "+PONG\r\n";
         const size_t pong_msg_len = strlen(pong_msg);
