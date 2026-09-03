@@ -151,13 +151,13 @@ private:
 
 public:
   [[nodiscard]] bool has_command() const {
-    return !commands.empty();
+    return !_commands.empty();
   }
 
   [[nodiscard]] std::vector<std::string> get_command() {
     assert(has_command());
-    std::vector<std::string> command = std::move(commands.front());
-    commands.pop();
+    std::vector<std::string> command = std::move(_commands.front());
+    _commands.pop();
     return command;
   }
 
@@ -166,18 +166,18 @@ public:
       switch (_state) {
         case state::expect_command:
           {
-            assert(args_expected == 0);
+            assert(_args_expected == 0);
             if (!conn.has_str()) {
               return;
             }
             const std::string str = conn.read_str();
             if (str[0] != '*') {
               std::istringstream iss{str};
-              commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
+              _commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
               break;
             }
-            args_expected = from_chars(str, 1, str.size() - 2);
-            if (args_expected == 0) {
+            _args_expected = from_chars(str, 1, str.size() - 2);
+            if (_args_expected == 0) {
               break;
             }
             _state = state::expect_arg_len;
@@ -185,7 +185,7 @@ public:
           }
         case state::expect_arg_len:
           {
-            assert(arg_len == 0);
+            assert(_arg_len == 0);
             if (!conn.has_str()) {
               return;
             }
@@ -193,27 +193,27 @@ public:
             if (str[0] != '$') {
               throw std::invalid_argument("parse_str_len: expected str_len");
             }
-            arg_len = from_chars(str, 1, str.size() - 2);
+            _arg_len = from_chars(str, 1, str.size() - 2);
             _state = state::expect_arg_payload;
             break;
           }
         case state::expect_arg_payload:
           {
-            if (!conn.has_bytes(arg_len + 2)) {
+            if (!conn.has_bytes(_arg_len + 2)) {
               return;
             }
-            std::string str = conn.read_bytes(arg_len + 2);
+            std::string str = conn.read_bytes(_arg_len + 2);
             assert(str[str.size() - 2] == '\r');
             assert(str[str.size() - 1] == '\n');
             str.pop_back();
             str.pop_back();
-            wip_command.push_back(std::move(str));
-            arg_len = 0;
+            _wip_command.push_back(std::move(str));
+            _arg_len = 0;
             _state = state::expect_arg_len;
-            if (wip_command.size() == args_expected) {
-              commands.push(std::move(wip_command));
-              wip_command.clear();
-              args_expected = 0;
+            if (_wip_command.size() == _args_expected) {
+              _commands.push(std::move(_wip_command));
+              _wip_command.clear();
+              _args_expected = 0;
               _state = state::expect_command;
             }
             break;
@@ -261,11 +261,11 @@ private:
     return value;
   }
 
-  std::queue<std::vector<std::string>> commands;
-  std::vector<std::string> wip_command;
+  std::queue<std::vector<std::string>> _commands;
+  std::vector<std::string> _wip_command;
   state _state{state::expect_command};
-  size_t args_expected{0};
-  size_t arg_len{0};
+  size_t _args_expected = 0;
+  size_t _arg_len = 0;
 };
 
 class executor {
