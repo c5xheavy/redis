@@ -32,6 +32,8 @@ constexpr size_t REDIS_PORT = 6379;
 constexpr size_t MAX_EVENTS = 10;
 constexpr size_t RECV_BUF_MAX_SIZE = 1024;
 
+namespace redis {
+
 class connection {
 private:
   class unique_fd {
@@ -247,6 +249,8 @@ private:
   //TODO(amir): state
 };
 
+}  // namespace redis
+
 int main() {
   try {
     // Flush after every std::cout / std::cerr
@@ -256,7 +260,7 @@ int main() {
     // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
     (void)signal(SIGPIPE, SIG_IGN);
 
-    std::map<int, std::pair<connection, parser>> connections;
+    std::map<int, std::pair<redis::connection, redis::parser>> connections;
     epoll_event ev{};
     std::array<epoll_event, MAX_EVENTS> events{};
 
@@ -341,8 +345,8 @@ int main() {
           }
           std::cout << "Client connected\n";
 
-          auto try_emplace_rv = connections.try_emplace(
-              client_fd, std::make_pair(connection{client_fd}, parser{}));  // (int, {connection(int), parser()})
+          auto try_emplace_rv =
+              connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
           assert(try_emplace_rv.second);
           ev.events = EPOLLIN;
           ev.data.fd = client_fd;
@@ -374,7 +378,7 @@ int main() {
           conn.append(recv_buf, bytes_recv);
           pars.parse_input(conn);
           while (pars.has_command()) {
-            const std::string resp = executor::execute(pars.get_command());
+            const std::string resp = redis::executor::execute(pars.get_command());
 
             ssize_t bytes_send = -1;
             do {
