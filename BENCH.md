@@ -11,3 +11,5 @@ Same machine, same conditions, loopback. p99.9 is the first percentile line >= 9
 | 2026-08-27 18:54 | 0cee8a4 | PING_MBULK | 212766 | 0.119 | 0.215 | 0.295 | 0.423 | per-connection state (connection* in epoll_data.ptr); recv/send path unchanged |
 | 2026-09-02 13:38 | fc7dabc | PING_INLINE | 215983 | 0.119 | 0.247 | 0.527 | 0.823 | input deque buffer + map::at lookup on recv path; since 0cee8a4: 27 commits |
 | 2026-09-02 13:38 | fc7dabc | PING_MBULK | 207900 | 0.047 | 0.103 | 0.223 | 0.799 | input deque buffer + map::at lookup on recv path; since 0cee8a4: 27 commits |
+| 2026-09-03 12:14 | 4d9c88d | PING_INLINE | 214133 | 0.119 | 0.263 | 0.415 | 0.671 | RESP state-machine parser on the hot path (deque line/byte reads per command); since fc7dabc: 9 commits |
+| 2026-09-03 12:14 | 4d9c88d | PING_MBULK | 217628 | 0.111 | 0.183 | 0.359 | 0.615 | RESP state-machine parser on the hot path (deque line/byte reads per command); since fc7dabc: 9 commits |
