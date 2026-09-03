@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <exception>
 #include <fcntl.h>
 #include <iostream>
 #include <iterator>
@@ -281,6 +282,7 @@ private:
 };
 
 int main() {
+  try {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
@@ -423,4 +425,7 @@ int main() {
   }
 
   exit(EXIT_SUCCESS);
+  } catch (const std::exception& e) {
+    std::cout << e.what() << '\n';
+  }
 }
