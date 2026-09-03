@@ -52,3 +52,20 @@ CheckOptions:
   modernize-use-std-print.StrictMode: true
   performance-inefficient-string-concatenation.StrictMode: true
   readability-avoid-return-with-void-value.StrictMode: true
+  # Naming: STL-style lower_case everywhere, UPPER_CASE for global constexpr
+  # constants, private members prefixed with `_`. Without these options the
+  # identifier-naming check verifies nothing.
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: lower_case
+  readability-identifier-naming.StructCase: lower_case
+  readability-identifier-naming.EnumCase: lower_case
+  readability-identifier-naming.EnumConstantCase: lower_case
+  readability-identifier-naming.TypeAliasCase: lower_case
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.MethodCase: lower_case
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.PrivateMemberPrefix: '_'
+  readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+  readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
