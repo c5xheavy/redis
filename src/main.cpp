@@ -1,21 +1,29 @@
 #include <array>
 #include <cassert>
 #include <cerrno>
+#include <charconv>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <fcntl.h>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <netinet/in.h>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <system_error>
 #include <type_traits>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 constexpr size_t REDIS_PORT = 6379;
 constexpr size_t MAX_EVENTS = 10;
@@ -130,6 +138,134 @@ private:
 
 static_assert(std::is_nothrow_move_constructible_v<connection>);
 static_assert(std::is_nothrow_move_assignable_v<connection>);
+
+class parser {
+private:
+  enum class state : std::uint8_t {
+    expect_command,
+    expect_arg_len,
+    expect_arg_payload
+  };
+
+public:
+  [[nodiscard]] bool has_command() const {
+    return !commands.empty();
+  }
+
+  [[nodiscard]] std::vector<std::string> get_command() {
+    assert(has_command());
+    std::vector<std::string> command = std::move(commands.front());
+    commands.pop();
+    return command;
+  }
+
+  void parse_input(connection& conn) {
+    while (true) {
+      switch (_state) {
+        case state::expect_command:
+          {
+            assert(args_expected == 0);
+            if (!conn.has_str()) {
+              return;
+            }
+            const std::string str = conn.read_str();
+            if (str[0] != '*') {
+              std::istringstream iss{str};
+              commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
+              break;
+            }
+            args_expected = from_chars(str, 1, str.size() - 2);
+            if (args_expected == 0) {
+              std::cout << "args_expected: " << args_expected << '\n';
+              break;
+            }
+            _state = state::expect_arg_len;
+            break;
+          }
+        case state::expect_arg_len:
+          {
+            assert(arg_len == 0);
+            if (!conn.has_str()) {
+              return;
+            }
+            const std::string str = conn.read_str();
+            if (str[0] != '$') {
+              throw std::invalid_argument("parse_str_len: expected str_len");
+            }
+            arg_len = from_chars(str, 1, str.size() - 2);
+            _state = state::expect_arg_payload;
+            break;
+          }
+        case state::expect_arg_payload:
+          {
+            if (!conn.has_bytes(arg_len + 2)) {
+              return;
+            }
+            std::string str = conn.read_bytes(arg_len + 2);
+            assert(str[str.size() - 2] == '\r');
+            assert(str[str.size() - 1] == '\n');
+            str.pop_back();
+            str.pop_back();
+            wip_command.push_back(std::move(str));
+            arg_len = 0;
+            _state = state::expect_arg_len;
+            if (wip_command.size() == args_expected) {
+              commands.push(std::move(wip_command));
+              wip_command.clear();
+              args_expected = 0;
+              _state = state::expect_command;
+            }
+            break;
+          }
+      }
+    }
+  }
+
+private:
+  /*
+  [[nodiscard]] bool parse_arr_len(connection& conn) {
+    assert(arr_len == 0);
+    if (!conn.has_str()) {
+      return false;
+    }
+    const std::string str = conn.read_str();
+    if (str[0] != '*') {
+      throw std::invalid_argument("parse_arr_len: expected arr_len");
+    }
+    arr_len = from_chars(str, 1, str.size() - 2);
+    return true;
+  }
+
+  [[nodiscard]] bool parse_str_len(connection& conn) {
+    assert(str_len == 0);
+    if (!conn.has_str()) {
+      return false;
+    }
+    const std::string str = conn.read_str();
+    if (str[0] != '$') {
+      throw std::invalid_argument("parse_str_len: expected str_len");
+    }
+    str_len = from_chars(str, 1, str.size() - 2);
+    return true;
+  }
+  */
+
+  [[nodiscard]] static size_t from_chars(const std::string& str, size_t first, size_t last) {
+    assert(first < last);
+    assert(last <= str.size());
+    size_t value = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): std::from_chars takes pointer pairs, there is no span/range overload
+    auto [ptr, ec] = std::from_chars(str.c_str() + first, str.c_str() + last, value);
+    assert(ec == std::errc{});
+    return value;
+  }
+
+  std::queue<std::vector<std::string>> commands;
+  std::vector<std::string> wip_command;
+  state _state{state::expect_command};
+  size_t args_expected{0};
+  size_t arg_len{0};
+};
 
 int main() {
   // Flush after every std::cout / std::cerr
