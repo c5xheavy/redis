@@ -17,7 +17,7 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
 
-  step "[1/3] build: build, build-asan, build-tsan, build-release"
+  step "[1/4] build: build, build-asan, build-tsan, build-release"
   # No vcpkg dependencies are used; only pass the toolchain if vcpkg is actually installed
   if [ -n "${VCPKG_ROOT}" ]; then
     cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake >/dev/null
@@ -32,13 +32,22 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
   cmake -B build-tsan    -S . -DCMAKE_BUILD_TYPE=Tsan    >/dev/null && cmake --build build-tsan
   cmake -B build-release -S . -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build build-release
 
-  step "[2/3] clang-tidy"
+  step "[2/4] clang-tidy"
   # Any finding stops the script before the server runs (zero-findings baseline).
   clang-tidy -p build --quiet --warnings-as-errors='*' src/*.cpp
   echo "clang-tidy: clean"
+
+  step "[3/4] regression suite (Asan build)"
+  # Any FAIL stops the script before the server runs. SKIP_SUITE=1 to bypass
+  # while debugging a known-red scenario.
+  if [ -n "${SKIP_SUITE}" ]; then
+    echo "suite: skipped (SKIP_SUITE set)"
+  else
+    python3 suite.py
+  fi
 )
 
-step "[3/3] run: build/redis $*"
+step "[4/4] run: build/redis $*"
 # Copied from .codecrafters/run.sh
 #
 # - Edit this to change how your program runs locally
