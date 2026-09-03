@@ -1,0 +1,16 @@
+# Formatting = layout only; naming lives in .clang-tidy (readability-identifier-naming).
+# Apply: clang-format -i src/*.cpp
+#
+# Base is Google (2-space indent, attached braces, pointer binds left: `char* p`),
+# adjusted to what this codebase already does:
+#   ColumnLimit 120     — the code runs long lines deliberately
+#   ReflowComments false — NOLINTNEXTLINE(...) markers must stay on their own line
+#   AccessModifierOffset -2 — `public:` at class-brace column
+#   AllowShortFunctionsOnASingleLine Empty — one-line getters stay expanded
+BasedOnStyle: Google
+ColumnLimit: 120
+ReflowComments: false
+AccessModifierOffset: -2
+AllowShortFunctionsOnASingleLine: Empty
+DerivePointerAlignment: false
+PointerAlignment: Left
