@@ -1,3 +1,10 @@
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <array>
 #include <cassert>
 #include <cerrno>
@@ -9,21 +16,15 @@
 #include <cstring>
 #include <deque>
 #include <exception>
-#include <fcntl.h>
 #include <iostream>
 #include <iterator>
 #include <map>
-#include <netinet/in.h>
 #include <queue>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <system_error>
 #include <type_traits>
-#include <unistd.h>
 #include <utility>
 #include <vector>
 
@@ -82,7 +83,7 @@ public:
 
   connection(const connection&) = delete;
   connection& operator=(const connection&) = delete;
- 
+
   [[nodiscard]] size_t input_buffer_size() const {
     return _input_buffer.size();
   }
@@ -101,13 +102,13 @@ public:
   [[nodiscard]] std::string read_bytes(size_t n) {
     assert(has_bytes(n));
     std::string res;
-    while(n-- > 0) {
+    while (n-- > 0) {
       res.push_back(_input_buffer.front());
       _input_buffer.pop_front();
     }
     return res;
   }
- 
+
   [[nodiscard]] bool has_str() const {
     if (_input_buffer.size() < 2) {
       return false;
@@ -121,7 +122,7 @@ public:
   }
 
   [[nodiscard]] std::string read_str() {
-    assert(has_str());   
+    assert(has_str());
     std::string res;
     while (!_input_buffer.empty() && (res.size() < 2 || res[res.size() - 2] != '\r' || res[res.size() - 1] != '\n')) {
       res.push_back(_input_buffer.front());
@@ -143,11 +144,7 @@ static_assert(std::is_nothrow_move_assignable_v<connection>);
 
 class parser {
 private:
-  enum class state : std::uint8_t {
-    expect_command,
-    expect_arg_len,
-    expect_arg_payload
-  };
+  enum class state : std::uint8_t { expect_command, expect_arg_len, expect_arg_payload };
 
 public:
   [[nodiscard]] bool has_command() const {
@@ -164,60 +161,57 @@ public:
   void parse_input(connection& conn) {
     while (true) {
       switch (_state) {
-        case state::expect_command:
-          {
-            assert(_args_expected == 0);
-            if (!conn.has_str()) {
-              return;
-            }
-            const std::string str = conn.read_str();
-            if (str[0] != '*') {
-              std::istringstream iss{str};
-              _commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
-              break;
-            }
-            _args_expected = from_chars(str, 1, str.size() - 2);
-            if (_args_expected == 0) {
-              break;
-            }
-            _state = state::expect_arg_len;
+        case state::expect_command: {
+          assert(_args_expected == 0);
+          if (!conn.has_str()) {
+            return;
+          }
+          const std::string str = conn.read_str();
+          if (str[0] != '*') {
+            std::istringstream iss{str};
+            _commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
             break;
           }
-        case state::expect_arg_len:
-          {
-            assert(_arg_len == 0);
-            if (!conn.has_str()) {
-              return;
-            }
-            const std::string str = conn.read_str();
-            if (str[0] != '$') {
-              throw std::invalid_argument("parse_str_len: expected str_len");
-            }
-            _arg_len = from_chars(str, 1, str.size() - 2);
-            _state = state::expect_arg_payload;
+          _args_expected = from_chars(str, 1, str.size() - 2);
+          if (_args_expected == 0) {
             break;
           }
-        case state::expect_arg_payload:
-          {
-            if (!conn.has_bytes(_arg_len + 2)) {
-              return;
-            }
-            std::string str = conn.read_bytes(_arg_len + 2);
-            assert(str[str.size() - 2] == '\r');
-            assert(str[str.size() - 1] == '\n');
-            str.pop_back();
-            str.pop_back();
-            _wip_command.push_back(std::move(str));
-            _arg_len = 0;
-            _state = state::expect_arg_len;
-            if (_wip_command.size() == _args_expected) {
-              _commands.push(std::move(_wip_command));
-              _wip_command.clear();
-              _args_expected = 0;
-              _state = state::expect_command;
-            }
-            break;
+          _state = state::expect_arg_len;
+          break;
+        }
+        case state::expect_arg_len: {
+          assert(_arg_len == 0);
+          if (!conn.has_str()) {
+            return;
           }
+          const std::string str = conn.read_str();
+          if (str[0] != '$') {
+            throw std::invalid_argument("parse_str_len: expected str_len");
+          }
+          _arg_len = from_chars(str, 1, str.size() - 2);
+          _state = state::expect_arg_payload;
+          break;
+        }
+        case state::expect_arg_payload: {
+          if (!conn.has_bytes(_arg_len + 2)) {
+            return;
+          }
+          std::string str = conn.read_bytes(_arg_len + 2);
+          assert(str[str.size() - 2] == '\r');
+          assert(str[str.size() - 1] == '\n');
+          str.pop_back();
+          str.pop_back();
+          _wip_command.push_back(std::move(str));
+          _arg_len = 0;
+          _state = state::expect_arg_len;
+          if (_wip_command.size() == _args_expected) {
+            _commands.push(std::move(_wip_command));
+            _wip_command.clear();
+            _args_expected = 0;
+            _state = state::expect_command;
+          }
+          break;
+        }
       }
     }
   }
@@ -283,152 +277,153 @@ private:
 
 int main() {
   try {
-  // Flush after every std::cout / std::cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
+    // Flush after every std::cout / std::cerr
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
-  // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
-  (void)signal(SIGPIPE, SIG_IGN);
+    // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
+    (void)signal(SIGPIPE, SIG_IGN);
 
-  std::map<int, std::pair<connection, parser>> connections;
-  epoll_event ev{};
-  std::array<epoll_event, MAX_EVENTS> events{};
+    std::map<int, std::pair<connection, parser>> connections;
+    epoll_event ev{};
+    std::array<epoll_event, MAX_EVENTS> events{};
 
-  const int epoll_fd = epoll_create1(0);
-  if (epoll_fd < 0) {
-    perror("epoll_create1");
-    exit(EXIT_FAILURE);
-  }
-
-  const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd < 0) {
-    perror("socket");
-    exit(EXIT_FAILURE);
-  }
-
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
-  if (fcntl(server_fd, F_SETFL, O_NONBLOCK) != 0) {
-    perror("fcntl");
-    exit(EXIT_FAILURE);
-  }
-
-  // Since the tester restarts your program quite often, setting SO_REUSEADDR
-  // ensures that we don't run into 'Address already in use' errors
-  int reuse = 1;
-  // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-    perror("setsockopt");
-    exit(EXIT_FAILURE);
-  }
-
-  struct sockaddr_in server_addr{};
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(REDIS_PORT);
-
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-  if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
-    perror("bind");
-    exit(EXIT_FAILURE);
-  }
-
-  const int connection_backlog = 5;
-  if (listen(server_fd, connection_backlog) != 0) {
-    perror("listen");
-    exit(EXIT_FAILURE);
-  }
-
-  ev.events = EPOLLIN;
-  ev.data.fd = server_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev) != 0) {
-    perror("epoll_ctl: server_fd");
-    exit(EXIT_FAILURE);
-  }
-
-  struct sockaddr_in client_addr{};
-  socklen_t client_addr_len = sizeof(client_addr);
-
-  while (true) {
-    int nfds = 0;
-    do {
-      nfds = epoll_wait(epoll_fd, events.data(), MAX_EVENTS, -1);
-    } while (nfds < 0 && errno == EINTR);
-    if (nfds < 0) {
-      perror("epoll_wait");
+    const int epoll_fd = epoll_create1(0);
+    if (epoll_fd < 0) {
+      perror("epoll_create1");
       exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < nfds; ++i) {
-      if (events.at(i).data.fd == server_fd) {
-        std::cout << "Connecting client...\n";
-        int client_fd = -1;
-        do {
-          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-          client_fd = accept4(server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
-        } while (client_fd < 0 && errno == EINTR);
-        if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          perror("accept");
-          exit(EXIT_FAILURE);
-        }
-        if (client_fd < 0) {
-          continue;
-        }
-        std::cout << "Client connected\n";
+    const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+      perror("socket");
+      exit(EXIT_FAILURE);
+    }
 
-        auto try_emplace_rv = connections.try_emplace(client_fd, std::make_pair(connection{client_fd}, parser{})); // (int, {connection(int), parser()})
-        assert(try_emplace_rv.second);
-        ev.events = EPOLLIN;
-        ev.data.fd = client_fd;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) != 0) {
-          perror("epoll_ctl: client_fd");
-          exit(EXIT_FAILURE);
-        }
-      } else {
-        std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
+    if (fcntl(server_fd, F_SETFL, O_NONBLOCK) != 0) {
+      perror("fcntl");
+      exit(EXIT_FAILURE);
+    }
 
-        const int client_fd = events.at(i).data.fd;
+    // Since the tester restarts your program quite often, setting SO_REUSEADDR
+    // ensures that we don't run into 'Address already in use' errors
+    int reuse = 1;
+    // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+      perror("setsockopt");
+      exit(EXIT_FAILURE);
+    }
 
-        ssize_t bytes_recv = -1;
-        do {
-          bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
-        } while (bytes_recv < 0 && errno == EINTR);
-        if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          std::cout << "Closing client " << client_fd << " after failed recv\n";
-          connections.erase(client_fd);
-          continue;
-        }
-        if (bytes_recv == 0) {
-          std::cout << "Client " << client_fd << " closed connection\n";
-          connections.erase(client_fd);
-          continue;
-        }
+    struct sockaddr_in server_addr {};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(REDIS_PORT);
 
-        auto& [conn, pars] = connections.at(client_fd);
-        conn.append(recv_buf, bytes_recv);
-        pars.parse_input(conn);
-        while (pars.has_command()) {
-          const std::string resp = executor::execute(pars.get_command());
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+    if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
+      perror("bind");
+      exit(EXIT_FAILURE);
+    }
 
-          ssize_t bytes_send = -1;
+    const int connection_backlog = 5;
+    if (listen(server_fd, connection_backlog) != 0) {
+      perror("listen");
+      exit(EXIT_FAILURE);
+    }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = server_fd;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev) != 0) {
+      perror("epoll_ctl: server_fd");
+      exit(EXIT_FAILURE);
+    }
+
+    struct sockaddr_in client_addr {};
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    while (true) {
+      int nfds = 0;
+      do {
+        nfds = epoll_wait(epoll_fd, events.data(), MAX_EVENTS, -1);
+      } while (nfds < 0 && errno == EINTR);
+      if (nfds < 0) {
+        perror("epoll_wait");
+        exit(EXIT_FAILURE);
+      }
+
+      for (int i = 0; i < nfds; ++i) {
+        if (events.at(i).data.fd == server_fd) {
+          std::cout << "Connecting client...\n";
+          int client_fd = -1;
           do {
-            bytes_send = send(client_fd, resp.c_str(), resp.size(), 0);
-          } while (bytes_send < 0 && errno == EINTR);
-          if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            std::cout << "Closing client " << client_fd << " after failed send\n";
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+            client_fd = accept4(server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
+          } while (client_fd < 0 && errno == EINTR);
+          if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            perror("accept");
+            exit(EXIT_FAILURE);
+          }
+          if (client_fd < 0) {
+            continue;
+          }
+          std::cout << "Client connected\n";
+
+          auto try_emplace_rv = connections.try_emplace(
+              client_fd, std::make_pair(connection{client_fd}, parser{}));  // (int, {connection(int), parser()})
+          assert(try_emplace_rv.second);
+          ev.events = EPOLLIN;
+          ev.data.fd = client_fd;
+          if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) != 0) {
+            perror("epoll_ctl: client_fd");
+            exit(EXIT_FAILURE);
+          }
+        } else {
+          std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
+
+          const int client_fd = events.at(i).data.fd;
+
+          ssize_t bytes_recv = -1;
+          do {
+            bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
+          } while (bytes_recv < 0 && errno == EINTR);
+          if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            std::cout << "Closing client " << client_fd << " after failed recv\n";
             connections.erase(client_fd);
-            break;
+            continue;
+          }
+          if (bytes_recv == 0) {
+            std::cout << "Client " << client_fd << " closed connection\n";
+            connections.erase(client_fd);
+            continue;
+          }
+
+          auto& [conn, pars] = connections.at(client_fd);
+          conn.append(recv_buf, bytes_recv);
+          pars.parse_input(conn);
+          while (pars.has_command()) {
+            const std::string resp = executor::execute(pars.get_command());
+
+            ssize_t bytes_send = -1;
+            do {
+              bytes_send = send(client_fd, resp.c_str(), resp.size(), 0);
+            } while (bytes_send < 0 && errno == EINTR);
+            if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+              std::cout << "Closing client " << client_fd << " after failed send\n";
+              connections.erase(client_fd);
+              break;
+            }
           }
         }
       }
     }
-  }
 
-  if (close(server_fd) != 0) {
-    perror("close: server_fd");
-    exit(EXIT_FAILURE);
-  }
+    if (close(server_fd) != 0) {
+      perror("close: server_fd");
+      exit(EXIT_FAILURE);
+    }
 
-  exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
   } catch (const std::exception& e) {
     std::cout << e.what() << '\n';
   }
