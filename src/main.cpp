@@ -290,7 +290,7 @@ int main() {
   // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
   (void)signal(SIGPIPE, SIG_IGN);
 
-  std::map<int, connection> connections;
+  std::map<int, std::pair<connection, parser>> connections;
   epoll_event ev{};
   std::array<epoll_event, MAX_EVENTS> events{};
 
@@ -375,7 +375,7 @@ int main() {
         }
         std::cout << "Client connected\n";
 
-        auto try_emplace_rv = connections.try_emplace(client_fd, client_fd); // (int, connection(int))
+        auto try_emplace_rv = connections.try_emplace(client_fd, std::make_pair(connection{client_fd}, parser{})); // (int, {connection(int), parser()})
         assert(try_emplace_rv.second);
         ev.events = EPOLLIN;
         ev.data.fd = client_fd;
@@ -385,9 +385,6 @@ int main() {
         }
       } else {
         std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
-
-        const char* pong_msg = "+PONG\r\n";
-        const size_t pong_msg_len = strlen(pong_msg);
 
         const int client_fd = events.at(i).data.fd;
 
@@ -405,15 +402,22 @@ int main() {
           connections.erase(client_fd);
           continue;
         }
-        connections.at(client_fd).append(recv_buf, bytes_recv);
 
-        ssize_t bytes_send = -1;
-        do {
-          bytes_send = send(client_fd, pong_msg, pong_msg_len, 0);
-        } while (bytes_send < 0 && errno == EINTR);
-        if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          std::cout << "Closing client " << client_fd << " after failed send\n";
-          connections.erase(client_fd);
+        auto& [conn, pars] = connections.at(client_fd);
+        conn.append(recv_buf, bytes_recv);
+        pars.parse_input(conn);
+        while (pars.has_command()) {
+          const std::string resp = executor::execute(pars.get_command());
+
+          ssize_t bytes_send = -1;
+          do {
+            bytes_send = send(client_fd, resp.c_str(), resp.size(), 0);
+          } while (bytes_send < 0 && errno == EINTR);
+          if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            std::cout << "Closing client " << client_fd << " after failed send\n";
+            connections.erase(client_fd);
+            break;
+          }
         }
       }
     }
