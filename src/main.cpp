@@ -148,7 +148,7 @@ int main() {
     perror("epoll_create1");
     exit(EXIT_FAILURE);
   }
-  
+
   const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     perror("socket");
@@ -160,7 +160,7 @@ int main() {
     perror("fcntl");
     exit(EXIT_FAILURE);
   }
-  
+
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
   // ensures that we don't run into 'Address already in use' errors
   int reuse = 1;
@@ -169,18 +169,18 @@ int main() {
     perror("setsockopt");
     exit(EXIT_FAILURE);
   }
-  
+
   struct sockaddr_in server_addr{};
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(REDIS_PORT);
-  
+
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
   if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
     perror("bind");
     exit(EXIT_FAILURE);
   }
-  
+
   const int connection_backlog = 5;
   if (listen(server_fd, connection_backlog) != 0) {
     perror("listen");
@@ -193,7 +193,7 @@ int main() {
     perror("epoll_ctl: server_fd");
     exit(EXIT_FAILURE);
   }
-  
+
   struct sockaddr_in client_addr{};
   socklen_t client_addr_len = sizeof(client_addr);
 
@@ -267,7 +267,7 @@ int main() {
       }
     }
   }
- 
+
   if (close(server_fd) != 0) {
     perror("close: server_fd");
     exit(EXIT_FAILURE);
