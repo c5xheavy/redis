@@ -178,7 +178,6 @@ public:
             }
             args_expected = from_chars(str, 1, str.size() - 2);
             if (args_expected == 0) {
-              std::cout << "args_expected: " << args_expected << '\n';
               break;
             }
             _state = state::expect_arg_len;
