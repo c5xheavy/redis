@@ -20,6 +20,7 @@
 #include <string>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <system_error>
 #include <type_traits>
 #include <unistd.h>
