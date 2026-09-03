@@ -267,6 +267,19 @@ private:
   size_t arg_len{0};
 };
 
+class executor {
+public:
+  //TODO(amir): singleton
+  static std::string execute(const std::vector<std::string>& command) {
+    assert(command.size() == 1);
+    assert(command[0] == "ping");
+    return "+PONG\r\n";
+  }
+
+private:
+  //TODO(amir): state
+};
+
 int main() {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
