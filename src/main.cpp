@@ -160,15 +160,15 @@ public:
     return command;
   }
 
-  void parse_input(connection& conn) {
+  void parse_input(connection& connection) {
     while (true) {
       switch (_state) {
         case state::expect_command: {
           assert(_args_expected == 0);
-          if (!conn.has_str()) {
+          if (!connection.has_str()) {
             return;
           }
-          const std::string str = conn.read_str();
+          const std::string str = connection.read_str();
           if (str[0] != '*') {
             std::istringstream iss{str};
             _commands.emplace(std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{});
@@ -183,10 +183,10 @@ public:
         }
         case state::expect_arg_len: {
           assert(_arg_len == 0);
-          if (!conn.has_str()) {
+          if (!connection.has_str()) {
             return;
           }
-          const std::string str = conn.read_str();
+          const std::string str = connection.read_str();
           if (str[0] != '$') {
             throw std::invalid_argument("parse_str_len: expected str_len");
           }
@@ -195,10 +195,10 @@ public:
           break;
         }
         case state::expect_arg_payload: {
-          if (!conn.has_bytes(_arg_len + 2)) {
+          if (!connection.has_bytes(_arg_len + 2)) {
             return;
           }
-          std::string str = conn.read_bytes(_arg_len + 2);
+          std::string str = connection.read_bytes(_arg_len + 2);
           assert(str[str.size() - 2] == '\r');
           assert(str[str.size() - 1] == '\n');
           str.pop_back();
@@ -374,11 +374,11 @@ int main() {
             continue;
           }
 
-          auto& [conn, pars] = connections.at(client_fd);
-          conn.append(recv_buf, bytes_recv);
-          pars.parse_input(conn);
-          while (pars.has_command()) {
-            const std::string resp = redis::executor::execute(pars.get_command());
+          auto& [connection, parser] = connections.at(client_fd);
+          connection.append(recv_buf, bytes_recv);
+          parser.parse_input(connection);
+          while (parser.has_command()) {
+            const std::string resp = redis::executor::execute(parser.get_command());
 
             ssize_t bytes_send = -1;
             do {
