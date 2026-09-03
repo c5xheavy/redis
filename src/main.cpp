@@ -217,34 +217,6 @@ public:
   }
 
 private:
-  /*
-  [[nodiscard]] bool parse_arr_len(connection& conn) {
-    assert(arr_len == 0);
-    if (!conn.has_str()) {
-      return false;
-    }
-    const std::string str = conn.read_str();
-    if (str[0] != '*') {
-      throw std::invalid_argument("parse_arr_len: expected arr_len");
-    }
-    arr_len = from_chars(str, 1, str.size() - 2);
-    return true;
-  }
-
-  [[nodiscard]] bool parse_str_len(connection& conn) {
-    assert(str_len == 0);
-    if (!conn.has_str()) {
-      return false;
-    }
-    const std::string str = conn.read_str();
-    if (str[0] != '$') {
-      throw std::invalid_argument("parse_str_len: expected str_len");
-    }
-    str_len = from_chars(str, 1, str.size() - 2);
-    return true;
-  }
-  */
-
   [[nodiscard]] static size_t from_chars(const std::string& str, size_t first, size_t last) {
     assert(first < last);
     assert(last <= str.size());
