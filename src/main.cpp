@@ -393,17 +393,39 @@ int main() {
           connection.append(recv_buf, bytes_recv);
           parser.parse_input(connection);
           while (parser.has_command()) {
-            const std::string resp = redis::executor::execute(parser.get_command());
+            connection.append_output_buffer(redis::executor::execute(parser.get_command()));
+          }
 
+          std::span<const char> span = connection.get_bytes_for_send();
+          while (!span.empty()) {
             ssize_t bytes_send = -1;
             do {
-              bytes_send = send(client_fd, resp.c_str(), resp.size(), 0);
+              bytes_send = send(client_fd, span.data(), span.size(), 0);
             } while (bytes_send < 0 && errno == EINTR);
-            if (bytes_send < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-              std::cout << "Closing client " << client_fd << " after failed send\n";
-              connections.erase(client_fd);
+            if (bytes_send < 0) {
+              if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                std::cout << "Closing client " << client_fd << " after failed send\n";
+                connections.erase(client_fd);
+              } else {
+                ev.events = EPOLLIN | EPOLLOUT;
+                ev.data.fd = client_fd;
+                if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+                  perror("epoll_ctl: client_fd");
+                  exit(EXIT_FAILURE);
+                }
+              }
               break;
             }
+            connection.erase_bytes_after_send(bytes_send);
+            if (connection.get_bytes_for_send().empty()) {
+              ev.events = EPOLLIN;
+              ev.data.fd = client_fd;
+              if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+                perror("epoll_ctl: client_fd");
+                exit(EXIT_FAILURE);
+              }
+            }
+            span = connection.get_bytes_for_send();
           }
         }
       }
