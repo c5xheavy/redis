@@ -269,7 +269,7 @@ private:
 
 class connection_manager {
 public:
-  static ssize_t read(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
+  static ssize_t read_input(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
     //TODO(amir): multithreading
     static std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
     ssize_t bytes_recv = -1;
@@ -411,7 +411,7 @@ int main() {
         } else {
           const int client_fd = events.at(i).data.fd;
 
-          redis::connection_manager::read(connections, client_fd);
+          redis::connection_manager::read_input(connections, client_fd);
 
           if (connections.find(client_fd) == connections.end()) {
             continue;
