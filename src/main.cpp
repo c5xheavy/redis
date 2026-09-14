@@ -20,6 +20,7 @@
 #include <iterator>
 #include <map>
 #include <queue>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -135,10 +136,24 @@ public:
     return res;
   }
 
+  void append_output_buffer(const std::span<const char>& span) {
+    _output_buffer.insert(_output_buffer.end(), span.begin(), span.end());
+  }
+
+  [[nodiscard]] std::span<const char> get_bytes_for_send() const {
+    return std::span{_output_buffer}.subspan(_offset);
+  }
+
+  void erase_bytes_after_send(size_t n) {
+    assert(_offset + n <= _output_buffer.size());
+    _offset += n;
+  }
+
 private:
   unique_fd _client_fd;
   std::deque<char> _input_buffer;
-  std::deque<char> _output_buffer;
+  std::vector<char> _output_buffer;
+  size_t _offset = 0;
 };
 
 static_assert(std::is_nothrow_move_constructible_v<connection>);
