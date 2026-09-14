@@ -400,8 +400,8 @@ int main() {
             connection.append_output_buffer(redis::executor::execute(parser.get_command()));
           }
 
-          std::span<const char> span = connection.get_bytes_for_send();
-          while (!span.empty()) {
+          const std::span<const char> span = connection.get_bytes_for_send();
+          if (!span.empty()) {
             ssize_t bytes_send = -1;
             do {
               bytes_send = send(client_fd, span.data(), span.size(), 0);
@@ -418,7 +418,7 @@ int main() {
                   exit(EXIT_FAILURE);
                 }
               }
-              break;
+              continue;
             }
             connection.erase_bytes_after_send(bytes_send);
             if (connection.get_bytes_for_send().empty()) {
@@ -429,7 +429,6 @@ int main() {
                 exit(EXIT_FAILURE);
               }
             }
-            span = connection.get_bytes_for_send();
           }
         }
       }
