@@ -90,7 +90,7 @@ public:
     return _input_buffer.size();
   }
 
-  size_t append(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv) {
+  size_t append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv) {
     if (bytes_recv > 0) {
       _input_buffer.insert(_input_buffer.end(), recv_buf.begin(), recv_buf.begin() + bytes_recv);
     }
@@ -290,7 +290,7 @@ public:
     }
 
     auto& [connection, parser] = connections.at(client_fd);
-    connection.append(recv_buf, bytes_recv);
+    connection.append_input_buffer(recv_buf, bytes_recv);
     parser.parse_input(connection);
     while (parser.has_command()) {
       connection.append_output_buffer(redis::executor::execute(parser.get_command()));
