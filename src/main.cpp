@@ -31,22 +31,10 @@
 
 #include "connection.hpp"
 #include "defines.hpp"
+#include "executor.hpp"
 #include "parser.hpp"
 
 namespace redis {
-
-class executor {
-public:
-  //TODO(amir): singleton
-  static std::string execute(const std::vector<std::string>& command) {
-    assert(command.size() == 1);
-    assert(command[0] == "ping");
-    return "+PONG\r\n";
-  }
-
-private:
-  //TODO(amir): state
-};
 
 class server {
 public:
