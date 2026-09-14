@@ -205,6 +205,25 @@ def writer_that_never_reads(p):
     s.close()
 
 
+def slow_reader_gets_all_replies(p):
+    # Replies must exceed the kernel's hard send-buffer cap (tcp_wmem max, 4 MB
+    # here), otherwise the kernel absorbs everything and EAGAIN never happens —
+    # verified empirically: 350 KB passed with no EPOLLOUT code in the server.
+    n = 800000
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024)  # tiny window from the handshake on
+    s.settimeout(60.0)
+    s.connect(("127.0.0.1", PORT))
+    s.sendall(PING * n)                     # ~5.6 MB of replies > 4 MB kernel cap
+    time.sleep(0.5)
+    r = recv_until(s, n * len(PONG), deadline=120.0)
+    expect(r.count(PONG) == n, f"expected {n} PONGs, got {r.count(PONG)}")
+    s.close(); time.sleep(0.5)
+    before = cpu_ticks(p.pid); time.sleep(1.2); after = cpu_ticks(p.pid)
+    expect(after - before < 8, f"busy loop after drain: {after - before} ticks (EPOLLOUT left armed?)")
+    alive(p)
+
+
 def sigstop_sigcont(p):
     os.kill(p.pid, signal.SIGSTOP); time.sleep(0.2); os.kill(p.pid, signal.SIGCONT)
     time.sleep(0.1)
@@ -239,6 +258,7 @@ SCENARIOS = [
     rst_with_unread_reply,
     flood_then_hard_kill,
     writer_that_never_reads,
+    slow_reader_gets_all_replies,
     sigstop_sigcont,
     hygiene_after_disconnects,
 ]
@@ -250,7 +270,6 @@ SKIPPED = [
     ("empty_bulk_string_arg", "needs a non-ping command to carry it"),
     ("inline_empty_line_is_noop", "executor stub would assert on the empty command"),
     ("more_clients_than_fd_limit", "PLAN: accept EMFILE handling deferred"),
-    ("slow_reader_gets_all_replies", "PLAN: output buffer + EPOLLOUT not built yet"),
 ]
 
 # -----------------------------------------------------------------------------
