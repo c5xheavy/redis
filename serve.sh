@@ -34,7 +34,8 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
   step "[2/5] clang-tidy"
   # Any finding stops the script before the server runs (zero-findings baseline).
-  clang-tidy -p build --quiet --warnings-as-errors='*' src/*.cpp
+  # --header-filter: default reports the main file only; our headers are user code.
+  clang-tidy -p build --quiet --warnings-as-errors='*' --header-filter='src/.*' src/*.cpp
   echo "clang-tidy: clean"
 
   step "[3/5] regression suite (Asan build)"
@@ -47,8 +48,8 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
   fi
 
   step "[4/5] clang-format"
-  # Check only, never rewrites; apply with: clang-format -i src/*.cpp
-  clang-format --dry-run --Werror src/*.cpp
+  # Check only, never rewrites; apply with: clang-format -i src/*.cpp src/*.hpp
+  clang-format --dry-run --Werror src/*.cpp src/*.hpp
   echo "clang-format: clean"
 )
 
