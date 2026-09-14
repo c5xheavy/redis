@@ -29,9 +29,7 @@
 #include <utility>
 #include <vector>
 
-constexpr size_t REDIS_PORT = 6379;
-constexpr size_t MAX_EVENTS = 10;
-constexpr size_t RECV_BUF_MAX_SIZE = 1024;
+#include "defines.hpp"
 
 namespace redis {
 
