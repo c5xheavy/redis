@@ -42,10 +42,9 @@ private:
     explicit unique_fd(int fd) : _fd{fd} {}
 
     ~unique_fd() {
-      if (_fd == -1) {
-        return;
+      if (_fd != -1) {
+        close_fd();
       }
-      close_fd();
     }
 
     unique_fd(unique_fd&& other) noexcept : _fd{std::exchange(other._fd, -1)} {}
