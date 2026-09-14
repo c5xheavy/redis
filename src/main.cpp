@@ -267,6 +267,42 @@ private:
   //TODO(amir): state
 };
 
+class connection_manager {
+public:
+  static ssize_t read(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
+    //TODO(amir): multithreading
+    static std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
+    ssize_t bytes_recv = -1;
+    do {
+      bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
+    } while (bytes_recv < 0 && errno == EINTR);
+    if (bytes_recv < 0) {
+      if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        std::cout << "Closing client " << client_fd << " after failed recv\n";
+        connections.erase(client_fd);
+      }
+      return bytes_recv;
+    }
+    if (bytes_recv == 0) {
+      std::cout << "Client " << client_fd << " closed connection\n";
+      connections.erase(client_fd);
+      return bytes_recv;
+    }
+
+    auto& [connection, parser] = connections.at(client_fd);
+    connection.append(recv_buf, bytes_recv);
+    parser.parse_input(connection);
+    while (parser.has_command()) {
+      connection.append_output_buffer(redis::executor::execute(parser.get_command()));
+    }
+    return bytes_recv;
+  }
+
+  //  static ssize_t send(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
+  //    return -1;
+  //  }
+};
+
 }  // namespace redis
 
 int main() {
@@ -373,31 +409,15 @@ int main() {
             exit(EXIT_FAILURE);
           }
         } else {
-          std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
-
           const int client_fd = events.at(i).data.fd;
 
-          ssize_t bytes_recv = -1;
-          do {
-            bytes_recv = recv(client_fd, recv_buf.data(), sizeof(recv_buf), 0);
-          } while (bytes_recv < 0 && errno == EINTR);
-          if (bytes_recv < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            std::cout << "Closing client " << client_fd << " after failed recv\n";
-            connections.erase(client_fd);
-            continue;
-          }
-          if (bytes_recv == 0) {
-            std::cout << "Client " << client_fd << " closed connection\n";
-            connections.erase(client_fd);
+          redis::connection_manager::read(connections, client_fd);
+
+          if (connections.find(client_fd) == connections.end()) {
             continue;
           }
 
           auto& [connection, parser] = connections.at(client_fd);
-          connection.append(recv_buf, bytes_recv);
-          parser.parse_input(connection);
-          while (parser.has_command()) {
-            connection.append_output_buffer(redis::executor::execute(parser.get_command()));
-          }
 
           const std::span<const char> span = connection.get_bytes_for_send();
           if (!span.empty()) {
