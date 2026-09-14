@@ -267,8 +267,130 @@ private:
   //TODO(amir): state
 };
 
-class connection_manager {
+class server {
 public:
+  //TODO(amir): singleton
+
+  server() : _epoll_fd{epoll_create1(0)} {
+    if (_epoll_fd < 0) {
+      perror("epoll_create1");
+      exit(EXIT_FAILURE);
+    }
+
+    _server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (_server_fd < 0) {
+      perror("socket");
+      exit(EXIT_FAILURE);
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
+    if (fcntl(_server_fd, F_SETFL, O_NONBLOCK) != 0) {
+      perror("fcntl");
+      exit(EXIT_FAILURE);
+    }
+
+    // Since the tester restarts your program quite often, setting SO_REUSEADDR
+    // ensures that we don't run into 'Address already in use' errors
+    int reuse = 1;
+    // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
+    if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+      perror("setsockopt");
+      exit(EXIT_FAILURE);
+    }
+
+    struct sockaddr_in server_addr {};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(REDIS_PORT);
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+    if (bind(_server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
+      perror("bind");
+      exit(EXIT_FAILURE);
+    }
+
+    const int connection_backlog = 5;
+    if (listen(_server_fd, connection_backlog) != 0) {
+      perror("listen");
+      exit(EXIT_FAILURE);
+    }
+
+    _ev.events = EPOLLIN;
+    _ev.data.fd = _server_fd;
+    if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _server_fd, &_ev) != 0) {
+      perror("epoll_ctl: _server_fd");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  ~server() {
+    if (close(_server_fd) != 0) {
+      perror("close: server_fd");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  server(const server&) = delete;
+  server& operator=(const server&) = delete;
+
+  server(server&&) = delete;
+  server& operator=(server&&) = delete;
+
+  void serve() {
+    struct sockaddr_in client_addr {};
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    while (true) {
+      int nfds = 0;
+      do {
+        nfds = epoll_wait(_epoll_fd, _events.data(), MAX_EVENTS, -1);
+      } while (nfds < 0 && errno == EINTR);
+      if (nfds < 0) {
+        perror("epoll_wait");
+        exit(EXIT_FAILURE);
+      }
+
+      for (int i = 0; i < nfds; ++i) {
+        if (_events.at(i).data.fd == _server_fd) {
+          std::cout << "Connecting client...\n";
+          int client_fd = -1;
+          do {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+            client_fd = accept4(_server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
+          } while (client_fd < 0 && errno == EINTR);
+          if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            perror("accept");
+            exit(EXIT_FAILURE);
+          }
+          if (client_fd < 0) {
+            continue;
+          }
+          std::cout << "Client connected\n";
+
+          auto try_emplace_rv =
+              _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
+          assert(try_emplace_rv.second);
+          _ev.events = EPOLLIN;
+          _ev.data.fd = client_fd;
+          if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
+            perror("epoll_ctl: _client_fd");
+            exit(EXIT_FAILURE);
+          }
+        } else {
+          const int client_fd = _events.at(i).data.fd;
+
+          read_input(_connections, client_fd);
+
+          if (_connections.find(client_fd) == _connections.end()) {
+            continue;
+          }
+
+          send_output(_connections, _epoll_fd, client_fd);
+        }
+      }
+    }
+  }
+
   static ssize_t read_input(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
     //TODO(amir): multithreading
     static std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
@@ -336,6 +458,13 @@ public:
     }
     return 0;
   }
+
+private:
+  std::map<int, std::pair<redis::connection, redis::parser>> _connections;
+  epoll_event _ev{};
+  std::array<epoll_event, MAX_EVENTS> _events{};
+  int _epoll_fd;
+  int _server_fd;
 };
 
 }  // namespace redis
@@ -349,118 +478,8 @@ int main() {
     // NOLINTNEXTLINE(misc-include-cleaner): SIGPIPE is POSIX, canonical home is <signal.h>, which modernize-deprecated-headers bans; <csignal> provides it in practice
     (void)signal(SIGPIPE, SIG_IGN);
 
-    std::map<int, std::pair<redis::connection, redis::parser>> connections;
-    epoll_event ev{};
-    std::array<epoll_event, MAX_EVENTS> events{};
-
-    const int epoll_fd = epoll_create1(0);
-    if (epoll_fd < 0) {
-      perror("epoll_create1");
-      exit(EXIT_FAILURE);
-    }
-
-    const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) {
-      perror("socket");
-      exit(EXIT_FAILURE);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
-    if (fcntl(server_fd, F_SETFL, O_NONBLOCK) != 0) {
-      perror("fcntl");
-      exit(EXIT_FAILURE);
-    }
-
-    // Since the tester restarts your program quite often, setting SO_REUSEADDR
-    // ensures that we don't run into 'Address already in use' errors
-    int reuse = 1;
-    // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-      perror("setsockopt");
-      exit(EXIT_FAILURE);
-    }
-
-    struct sockaddr_in server_addr {};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(REDIS_PORT);
-
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-    if (bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
-      perror("bind");
-      exit(EXIT_FAILURE);
-    }
-
-    const int connection_backlog = 5;
-    if (listen(server_fd, connection_backlog) != 0) {
-      perror("listen");
-      exit(EXIT_FAILURE);
-    }
-
-    ev.events = EPOLLIN;
-    ev.data.fd = server_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev) != 0) {
-      perror("epoll_ctl: server_fd");
-      exit(EXIT_FAILURE);
-    }
-
-    struct sockaddr_in client_addr {};
-    socklen_t client_addr_len = sizeof(client_addr);
-
-    while (true) {
-      int nfds = 0;
-      do {
-        nfds = epoll_wait(epoll_fd, events.data(), MAX_EVENTS, -1);
-      } while (nfds < 0 && errno == EINTR);
-      if (nfds < 0) {
-        perror("epoll_wait");
-        exit(EXIT_FAILURE);
-      }
-
-      for (int i = 0; i < nfds; ++i) {
-        if (events.at(i).data.fd == server_fd) {
-          std::cout << "Connecting client...\n";
-          int client_fd = -1;
-          do {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-            client_fd = accept4(server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
-          } while (client_fd < 0 && errno == EINTR);
-          if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("accept");
-            exit(EXIT_FAILURE);
-          }
-          if (client_fd < 0) {
-            continue;
-          }
-          std::cout << "Client connected\n";
-
-          auto try_emplace_rv =
-              connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
-          assert(try_emplace_rv.second);
-          ev.events = EPOLLIN;
-          ev.data.fd = client_fd;
-          if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) != 0) {
-            perror("epoll_ctl: client_fd");
-            exit(EXIT_FAILURE);
-          }
-        } else {
-          const int client_fd = events.at(i).data.fd;
-
-          redis::connection_manager::read_input(connections, client_fd);
-
-          if (connections.find(client_fd) == connections.end()) {
-            continue;
-          }
-
-          redis::connection_manager::send_output(connections, epoll_fd, client_fd);
-        }
-      }
-    }
-
-    if (close(server_fd) != 0) {
-      perror("close: server_fd");
-      exit(EXIT_FAILURE);
-    }
+    redis::server server;
+    server.serve();
 
     exit(EXIT_SUCCESS);
   } catch (const std::exception& e) {
