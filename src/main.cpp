@@ -298,9 +298,44 @@ public:
     return bytes_recv;
   }
 
-  //  static ssize_t send(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
-  //    return -1;
-  //  }
+  static ssize_t send_output(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int epoll_fd,
+                             int client_fd) {
+    epoll_event ev{};
+    auto& [connection, parser] = connections.at(client_fd);
+
+    const std::span<const char> span = connection.get_bytes_for_send();
+    if (!span.empty()) {
+      ssize_t bytes_send = -1;
+      do {
+        bytes_send = send(client_fd, span.data(), span.size(), 0);
+      } while (bytes_send < 0 && errno == EINTR);
+      if (bytes_send < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+          std::cout << "Closing client " << client_fd << " after failed send\n";
+          connections.erase(client_fd);
+        } else {
+          ev.events = EPOLLIN | EPOLLOUT;
+          ev.data.fd = client_fd;
+          if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+            perror("epoll_ctl: client_fd");
+            exit(EXIT_FAILURE);
+          }
+        }
+        return bytes_send;
+      }
+      connection.erase_bytes_after_send(bytes_send);
+      if (connection.get_bytes_for_send().empty()) {
+        ev.events = EPOLLIN;
+        ev.data.fd = client_fd;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+          perror("epoll_ctl: client_fd");
+          exit(EXIT_FAILURE);
+        }
+      }
+      return bytes_send;
+    }
+    return 0;
+  }
 };
 
 }  // namespace redis
@@ -417,38 +452,7 @@ int main() {
             continue;
           }
 
-          auto& [connection, parser] = connections.at(client_fd);
-
-          const std::span<const char> span = connection.get_bytes_for_send();
-          if (!span.empty()) {
-            ssize_t bytes_send = -1;
-            do {
-              bytes_send = send(client_fd, span.data(), span.size(), 0);
-            } while (bytes_send < 0 && errno == EINTR);
-            if (bytes_send < 0) {
-              if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                std::cout << "Closing client " << client_fd << " after failed send\n";
-                connections.erase(client_fd);
-              } else {
-                ev.events = EPOLLIN | EPOLLOUT;
-                ev.data.fd = client_fd;
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-                  perror("epoll_ctl: client_fd");
-                  exit(EXIT_FAILURE);
-                }
-              }
-              continue;
-            }
-            connection.erase_bytes_after_send(bytes_send);
-            if (connection.get_bytes_for_send().empty()) {
-              ev.events = EPOLLIN;
-              ev.data.fd = client_fd;
-              if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-                perror("epoll_ctl: client_fd");
-                exit(EXIT_FAILURE);
-              }
-            }
-          }
+          redis::connection_manager::send_output(connections, epoll_fd, client_fd);
         }
       }
     }
