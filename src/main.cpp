@@ -147,6 +147,10 @@ public:
   void erase_bytes_after_send(size_t n) {
     assert(_offset + n <= _output_buffer.size());
     _offset += n;
+    if (_offset == _output_buffer.size()) {
+      _output_buffer.clear();
+      _offset = 0;
+    }
   }
 
 private:
