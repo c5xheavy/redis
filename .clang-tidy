@@ -18,6 +18,8 @@
 #   modernize-use-trailing-return-type - leading return type is the dominant industry style
 #     (LLVM, Chromium, Google); trailing stays where it is required (return type
 #     depends on parameters)
+#   llvm-header-guard - LLVM's guard naming convention is their house style; guard names
+#     are mine (bugprone-reserved-identifier still polices reserved spellings)
 Checks: >
   *,
   -objc-*,
@@ -36,7 +38,8 @@ Checks: >
   -readability-identifier-length,
   -avoid-do-while,
   -cppcoreguidelines-avoid-do-while,
-  -modernize-use-trailing-return-type
+  -modernize-use-trailing-return-type,
+  -llvm-header-guard
 CheckOptions:
   # Default is false, and with false `assert(map.try_emplace(...).second)` is NOT flagged.
   bugprone-assert-side-effect.CheckFunctionCalls: true
