@@ -1,19 +1,7 @@
 #ifndef MY_REDIS_SRC_EXECUTOR_HPP
 #define MY_REDIS_SRC_EXECUTOR_HPP
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <cassert>
-#include <cerrno>
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 #include <vector>
 
