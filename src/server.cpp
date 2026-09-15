@@ -28,20 +28,20 @@ namespace redis {
 
 server::server() : _epoll_fd{epoll_create1(0)} {
   if (_epoll_fd < 0) {
-    perror("epoll_create1");
-    exit(EXIT_FAILURE);
+    std::perror("epoll_create1");
+    std::exit(EXIT_FAILURE);
   }
 
   _server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (_server_fd < 0) {
-    perror("socket");
-    exit(EXIT_FAILURE);
+    std::perror("socket");
+    std::exit(EXIT_FAILURE);
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
   if (fcntl(_server_fd, F_SETFL, O_NONBLOCK) != 0) {
-    perror("fcntl");
-    exit(EXIT_FAILURE);
+    std::perror("fcntl");
+    std::exit(EXIT_FAILURE);
   }
 
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -49,8 +49,8 @@ server::server() : _epoll_fd{epoll_create1(0)} {
   int reuse = 1;
   // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
   if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-    perror("setsockopt");
-    exit(EXIT_FAILURE);
+    std::perror("setsockopt");
+    std::exit(EXIT_FAILURE);
   }
 
   struct sockaddr_in server_addr {};
@@ -60,28 +60,28 @@ server::server() : _epoll_fd{epoll_create1(0)} {
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
   if (bind(_server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
-    perror("bind");
-    exit(EXIT_FAILURE);
+    std::perror("bind");
+    std::exit(EXIT_FAILURE);
   }
 
   const int connection_backlog = 5;
   if (listen(_server_fd, connection_backlog) != 0) {
-    perror("listen");
-    exit(EXIT_FAILURE);
+    std::perror("listen");
+    std::exit(EXIT_FAILURE);
   }
 
   _ev.events = EPOLLIN;
   _ev.data.fd = _server_fd;
   if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _server_fd, &_ev) != 0) {
-    perror("epoll_ctl: _server_fd");
-    exit(EXIT_FAILURE);
+    std::perror("epoll_ctl: _server_fd");
+    std::exit(EXIT_FAILURE);
   }
 }
 
 server::~server() {
   if (close(_server_fd) != 0) {
-    perror("close: server_fd");
-    exit(EXIT_FAILURE);
+    std::perror("close: server_fd");
+    std::exit(EXIT_FAILURE);
   }
 }
 
@@ -95,8 +95,8 @@ void server::serve() {
       nfds = epoll_wait(_epoll_fd, _events.data(), MAX_EVENTS, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
-      perror("epoll_wait");
-      exit(EXIT_FAILURE);
+      std::perror("epoll_wait");
+      std::exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < nfds; ++i) {
@@ -108,8 +108,8 @@ void server::serve() {
           client_fd = accept4(_server_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len, SOCK_NONBLOCK);
         } while (client_fd < 0 && errno == EINTR);
         if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          perror("accept");
-          exit(EXIT_FAILURE);
+          std::perror("accept");
+          std::exit(EXIT_FAILURE);
         }
         if (client_fd < 0) {
           continue;
@@ -122,8 +122,8 @@ void server::serve() {
         _ev.events = EPOLLIN;
         _ev.data.fd = client_fd;
         if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
-          perror("epoll_ctl: _client_fd");
-          exit(EXIT_FAILURE);
+          std::perror("epoll_ctl: _client_fd");
+          std::exit(EXIT_FAILURE);
         }
       } else {
         const int client_fd = _events.at(i).data.fd;
@@ -188,8 +188,8 @@ ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::pa
         ev.events = EPOLLIN | EPOLLOUT;
         ev.data.fd = client_fd;
         if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-          perror("epoll_ctl: client_fd");
-          exit(EXIT_FAILURE);
+          std::perror("epoll_ctl: client_fd");
+          std::exit(EXIT_FAILURE);
         }
       }
       return bytes_send;
@@ -199,8 +199,8 @@ ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::pa
       ev.events = EPOLLIN;
       ev.data.fd = client_fd;
       if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-        perror("epoll_ctl: client_fd");
-        exit(EXIT_FAILURE);
+        std::perror("epoll_ctl: client_fd");
+        std::exit(EXIT_FAILURE);
       }
     }
     return bytes_send;
