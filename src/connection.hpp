@@ -28,11 +28,11 @@ public:
   connection(const connection&) = delete;
   connection& operator=(const connection&) = delete;
 
-  size_t append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv);
+  std::size_t append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv);
 
-  [[nodiscard]] bool has_bytes(size_t n) const;
+  [[nodiscard]] bool has_bytes(std::size_t n) const;
 
-  [[nodiscard]] std::string read_bytes(size_t n);
+  [[nodiscard]] std::string read_bytes(std::size_t n);
 
   [[nodiscard]] bool has_str() const;
 
@@ -42,13 +42,13 @@ public:
 
   [[nodiscard]] std::span<const char> get_bytes_for_send() const;
 
-  void erase_bytes_after_send(size_t n);
+  void erase_bytes_after_send(std::size_t n);
 
 private:
   unique_fd _client_fd;
   std::deque<char> _input_buffer;
   std::vector<char> _output_buffer;
-  size_t _offset = 0;
+  std::size_t _offset = 0;
 };
 
 static_assert(std::is_nothrow_move_constructible_v<connection>);

@@ -15,18 +15,18 @@
 
 namespace redis {
 
-size_t connection::append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv) {
+std::size_t connection::append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv) {
   if (bytes_recv > 0) {
     _input_buffer.insert(_input_buffer.end(), recv_buf.begin(), recv_buf.begin() + bytes_recv);
   }
   return _input_buffer.size();
 }
 
-bool connection::has_bytes(size_t n) const {
+bool connection::has_bytes(std::size_t n) const {
   return _input_buffer.size() >= n;
 }
 
-std::string connection::read_bytes(size_t n) {
+std::string connection::read_bytes(std::size_t n) {
   assert(has_bytes(n));
   std::string res;
   while (n-- > 0) {
@@ -40,7 +40,7 @@ bool connection::has_str() const {
   if (_input_buffer.size() < 2) {
     return false;
   }
-  for (size_t i = 0; i < _input_buffer.size() - 1; ++i) {
+  for (std::size_t i = 0; i < _input_buffer.size() - 1; ++i) {
     if (_input_buffer[i] == '\r' && _input_buffer[i + 1] == '\n') {
       return true;
     }
@@ -68,7 +68,7 @@ std::span<const char> connection::get_bytes_for_send() const {
   return std::span{_output_buffer}.subspan(_offset);
 }
 
-void connection::erase_bytes_after_send(size_t n) {
+void connection::erase_bytes_after_send(std::size_t n) {
   assert(_offset + n <= _output_buffer.size());
   _offset += n;
   if (_offset == _output_buffer.size()) {

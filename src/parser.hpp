@@ -23,13 +23,13 @@ public:
   void parse_input(connection& connection);
 
 private:
-  [[nodiscard]] static size_t from_chars(const std::string& str, size_t first, size_t last);
+  [[nodiscard]] static std::size_t from_chars(const std::string& str, std::size_t first, std::size_t last);
 
   std::queue<std::vector<std::string>> _commands;
   std::vector<std::string> _wip_command;
   state _state{state::expect_command};
-  size_t _args_expected = 0;
-  size_t _arg_len = 0;
+  std::size_t _args_expected = 0;
+  std::size_t _arg_len = 0;
 };
 
 }  // namespace redis
