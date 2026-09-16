@@ -128,19 +128,19 @@ void server::serve() {
       } else {
         const int client_fd = _events.at(i).data.fd;
 
-        read_input(_connections, client_fd);
+        read_input(client_fd);
 
         if (_connections.find(client_fd) == _connections.end()) {
           continue;
         }
 
-        send_output(_connections, _epoll_fd, client_fd);
+        send_output(client_fd);
       }
     }
   }
 }
 
-ssize_t server::read_input(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd) {
+ssize_t server::read_input(int client_fd) {
   //TODO(amir): multithreading
   static std::array<char, RECV_BUF_MAX_SIZE> recv_buf{};
   ssize_t bytes_recv = -1;
@@ -150,17 +150,17 @@ ssize_t server::read_input(std::map<int, std::pair<redis::connection, redis::par
   if (bytes_recv < 0) {
     if (errno != EAGAIN && errno != EWOULDBLOCK) {
       std::cout << "Closing client " << client_fd << " after failed recv\n";
-      connections.erase(client_fd);
+      _connections.erase(client_fd);
     }
     return bytes_recv;
   }
   if (bytes_recv == 0) {
     std::cout << "Client " << client_fd << " closed connection\n";
-    connections.erase(client_fd);
+    _connections.erase(client_fd);
     return bytes_recv;
   }
 
-  auto& [connection, parser] = connections.at(client_fd);
+  auto& [connection, parser] = _connections.at(client_fd);
   assert(bytes_recv >= 0);
   connection.append_input_buffer(recv_buf, static_cast<std::size_t>(bytes_recv));
   parser.parse_input(connection);
@@ -170,10 +170,9 @@ ssize_t server::read_input(std::map<int, std::pair<redis::connection, redis::par
   return bytes_recv;
 }
 
-ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int epoll_fd,
-                            int client_fd) {
+ssize_t server::send_output(int client_fd) {
   epoll_event ev{};
-  auto& [connection, parser] = connections.at(client_fd);
+  auto& [connection, parser] = _connections.at(client_fd);
 
   const std::span<const char> span = connection.get_bytes_for_send();
   if (!span.empty()) {
@@ -184,11 +183,11 @@ ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::pa
     if (bytes_send < 0) {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
-        connections.erase(client_fd);
+        _connections.erase(client_fd);
       } else {
         ev.events = EPOLLIN | EPOLLOUT;
         ev.data.fd = client_fd;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+        if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
           std::perror("epoll_ctl: client_fd");
           std::exit(EXIT_FAILURE);
         }
@@ -200,7 +199,7 @@ ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::pa
     if (connection.get_bytes_for_send().empty()) {
       ev.events = EPOLLIN;
       ev.data.fd = client_fd;
-      if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+      if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, client_fd, &ev) != 0) {
         std::perror("epoll_ctl: client_fd");
         std::exit(EXIT_FAILURE);
       }

@@ -30,10 +30,9 @@ public:
 
   [[noreturn]] void serve();
 
-  static ssize_t read_input(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd);
+  ssize_t read_input(int client_fd);
 
-  static ssize_t send_output(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int epoll_fd,
-                             int client_fd);
+  ssize_t send_output(int client_fd);
 
 private:
   std::map<int, std::pair<redis::connection, redis::parser>> _connections;
