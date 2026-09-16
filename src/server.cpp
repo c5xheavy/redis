@@ -98,7 +98,8 @@ void server::serve() {
       std::exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < nfds; ++i) {
+    assert(nfds >= 0);
+    for (std::size_t i = 0; i < static_cast<std::size_t>(nfds); ++i) {
       if (_events.at(i).data.fd == _server_fd) {
         std::cout << "Connecting client...\n";
         int client_fd = -1;
@@ -194,7 +195,8 @@ ssize_t server::send_output(std::map<int, std::pair<redis::connection, redis::pa
       }
       return bytes_send;
     }
-    connection.erase_bytes_after_send(bytes_send);
+    assert(bytes_send >= 0);
+    connection.erase_bytes_after_send(static_cast<std::size_t>(bytes_send));
     if (connection.get_bytes_for_send().empty()) {
       ev.events = EPOLLIN;
       ev.data.fd = client_fd;
