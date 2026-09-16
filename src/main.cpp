@@ -1,5 +1,4 @@
 #include <csignal>
-#include <cstdlib>
 #include <exception>
 #include <iostream>
 
@@ -16,8 +15,6 @@ int main() {
 
     redis::server server;
     server.serve();
-
-    exit(EXIT_SUCCESS);
   } catch (const std::exception& e) {
     std::cout << e.what() << '\n';
   }

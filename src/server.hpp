@@ -28,7 +28,7 @@ public:
   server(server&&) = delete;
   server& operator=(server&&) = delete;
 
-  void serve();
+  [[noreturn]] void serve();
 
   static ssize_t read_input(std::map<int, std::pair<redis::connection, redis::parser>>& connections, int client_fd);
 
