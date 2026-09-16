@@ -1,8 +1,6 @@
 #ifndef MY_REDIS_SRC_CONNECTION_HPP
 #define MY_REDIS_SRC_CONNECTION_HPP
 
-#include <sys/types.h>
-
 #include <array>
 #include <cstddef>
 #include <deque>
@@ -28,7 +26,7 @@ public:
   connection(const connection&) = delete;
   connection& operator=(const connection&) = delete;
 
-  std::size_t append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, ssize_t bytes_recv);
+  std::size_t append_input_buffer(const std::array<char, RECV_BUF_MAX_SIZE>& recv_buf, std::size_t bytes_recv);
 
   [[nodiscard]] bool has_bytes(std::size_t n) const;
 

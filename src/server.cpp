@@ -160,7 +160,8 @@ ssize_t server::read_input(std::map<int, std::pair<redis::connection, redis::par
   }
 
   auto& [connection, parser] = connections.at(client_fd);
-  connection.append_input_buffer(recv_buf, bytes_recv);
+  assert(bytes_recv >= 0);
+  connection.append_input_buffer(recv_buf, static_cast<std::size_t>(bytes_recv));
   parser.parse_input(connection);
   while (parser.has_command()) {
     connection.append_output_buffer(redis::executor::execute(parser.get_command()));
