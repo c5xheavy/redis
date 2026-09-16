@@ -11,9 +11,10 @@ class executor {
 public:
   //TODO(amir): singleton
   static std::string execute([[maybe_unused]] const std::vector<std::string>& command) {
-    assert(command.size() == 1);
-    assert(command[0] == "ping");
-    return "+PONG\r\n";
+    if (command.size() == 1 && command[0] == "ping") {
+      return "+PONG\r\n";
+    }
+    return "-ERR unknown command\r\n";
   }
 
 private:
