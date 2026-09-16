@@ -90,7 +90,7 @@ std::size_t parser::from_chars(const std::string& str, std::size_t first, std::s
   assert(last <= str.size());
   std::size_t value = 0;
   // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): std::from_chars takes pointer pairs, there is no span/range overload
-  auto [ptr, ec] = std::from_chars(str.c_str() + first, str.c_str() + last, value);
+  [[maybe_unused]] auto [ptr, ec] = std::from_chars(str.c_str() + first, str.c_str() + last, value);
   assert(ec == std::errc{});
   return value;
 }

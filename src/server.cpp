@@ -116,7 +116,7 @@ void server::serve() {
         }
         std::cout << "Client connected\n";
 
-        auto try_emplace_rv =
+        [[maybe_unused]] auto try_emplace_rv =
             _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
         assert(try_emplace_rv.second);
         _ev.events = EPOLLIN;

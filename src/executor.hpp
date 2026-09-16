@@ -10,7 +10,7 @@ namespace redis {
 class executor {
 public:
   //TODO(amir): singleton
-  static std::string execute(const std::vector<std::string>& command) {
+  static std::string execute([[maybe_unused]] const std::vector<std::string>& command) {
     assert(command.size() == 1);
     assert(command[0] == "ping");
     return "+PONG\r\n";
