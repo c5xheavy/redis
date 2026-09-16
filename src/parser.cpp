@@ -1,13 +1,8 @@
 #include "parser.hpp"
 
 #include <cassert>
-#include <cerrno>
 #include <charconv>
-#include <csignal>
 #include <cstddef>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <iterator>
 #include <queue>
 #include <sstream>

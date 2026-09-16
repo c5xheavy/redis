@@ -1,5 +1,6 @@
 #include "server.hpp"
 
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
@@ -10,10 +11,8 @@
 #include <array>
 #include <cassert>
 #include <cerrno>
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <iostream>
 #include <map>
 #include <span>

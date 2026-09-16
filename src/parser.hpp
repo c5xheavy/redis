@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "connection.hpp"
+namespace redis {
+class connection;
+}  // namespace redis
 
 namespace redis {
 
