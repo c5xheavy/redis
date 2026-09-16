@@ -17,7 +17,7 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
 
-  step "[1/6] build: build, build-asan, build-tsan, build-release"
+  step "[1/6] build: build, build-asan, build-tsan, build-release, build-clang"
   # No vcpkg dependencies are used; only pass the toolchain if vcpkg is actually installed
   if [ -n "${VCPKG_ROOT}" ]; then
     cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake >/dev/null
@@ -31,6 +31,8 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
   cmake -B build-asan    -S . -DCMAKE_BUILD_TYPE=Asan    >/dev/null && cmake --build build-asan
   cmake -B build-tsan    -S . -DCMAKE_BUILD_TYPE=Tsan    >/dev/null && cmake --build build-tsan
   cmake -B build-release -S . -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build build-release
+  cmake -B build-clang   -S . -DCMAKE_BUILD_TYPE=Everything -DCMAKE_CXX_COMPILER=clang++ >/dev/null \
+    && cmake --build build-clang
 
   step "[2/6] clang-tidy"
   # Any finding stops the script before the server runs (zero-findings baseline).

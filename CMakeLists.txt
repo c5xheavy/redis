@@ -20,6 +20,7 @@ target_link_libraries(redis PRIVATE Threads::Threads)
 #     GCC 13's libtsan dies with "unexpected memory mapping" under this kernel's ASLR range.
 #     Run it as `setarch $(uname -m) -R ./build-tsan/redis` (or `sudo sysctl vm.mmap_rnd_bits=28`).
 #   cmake -B build-release -DCMAKE_BUILD_TYPE=Release && cmake --build build-release   # -O3 -DNDEBUG
+#   cmake -B build-clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Everything    # clang -Weverything
 #
 # Every GCC warning that is about this code. Per-flag opt-outs, each with a reason:
 #   -Weffc++ - demands an init list entry for every member, including defaulted ones
@@ -48,4 +49,16 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Tsan")
   target_link_options(redis PRIVATE -fsanitize=thread)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(redis PRIVATE ${STRICT_WARNINGS})
+elseif(CMAKE_BUILD_TYPE STREQUAL "Everything")
+  # clang++ only: every warning clang has, including the ones LLVM itself calls excessive.
+  # Opt-outs, each with a reason:
+  #   c++98-compat / pre-c++2x-compat - this is a C++23 codebase on purpose
+  #   -Wpadded - the layout of the kernel's structs is not ours to fix
+  #   -Wunsafe-buffer-usage - wants std::span in place of every POSIX buffer + length API
+  #   -Wswitch-default - same reason as for GCC above
+  target_compile_options(redis PRIVATE -Werror -Weverything -O1 -g
+                                       -Wno-c++98-compat -Wno-c++98-compat-pedantic
+                                       -Wno-pre-c++14-compat -Wno-pre-c++17-compat
+                                       -Wno-pre-c++20-compat-pedantic -Wno-pre-c++23-compat
+                                       -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default)
 endif()
