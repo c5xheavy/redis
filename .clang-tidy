@@ -20,6 +20,10 @@
 #     depends on parameters)
 #   llvm-header-guard - LLVM's guard naming convention is their house style; guard names
 #     are mine (bugprone-reserved-identifier still polices reserved spellings)
+#   misc-include-cleaner - include hygiene belongs to include-what-you-use (serve.sh stage 3),
+#     which checks headers too, suggests forward declarations and follows the POSIX mapping
+#     (htons -> <arpa/inet.h>); this check answers by declaration site instead and the two
+#     then argue over the same line
 Checks: >
   *,
   -objc-*,
@@ -39,7 +43,8 @@ Checks: >
   -avoid-do-while,
   -cppcoreguidelines-avoid-do-while,
   -modernize-use-trailing-return-type,
-  -llvm-header-guard
+  -llvm-header-guard,
+  -misc-include-cleaner
 CheckOptions:
   # Default is false, and with false `assert(map.try_emplace(...).second)` is NOT flagged.
   bugprone-assert-side-effect.CheckFunctionCalls: true

@@ -36,9 +36,6 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
   # Any finding stops the script before the server runs (zero-findings baseline).
   # --header-filter: default reports the main file only; our headers are user code.
   clang-tidy -p build --quiet --warnings-as-errors='*' --header-filter='src/.*' src/*.cpp
-  # Second pass: each header compiled standalone as its own TU. Main-file-only
-  # checks (misc-include-cleaner) police headers only this way — IWYU per file.
-  clang-tidy --quiet --warnings-as-errors='*' src/*.hpp -- -x c++ -std=c++23
   echo "clang-tidy: clean"
 
   step "[3/6] include-what-you-use"
