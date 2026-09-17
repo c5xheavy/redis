@@ -16,6 +16,6 @@ int main() {
     redis::server server;
     server.serve();
   } catch (const std::exception& e) {
-    std::cout << e.what() << '\n';
+    std::cerr << e.what() << '\n';
   }
 }
