@@ -25,13 +25,13 @@
 namespace redis {
 
 server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_STREAM, 0)} {
-  if (static_cast<int>(_epoll_fd) < 0) {
-    std::perror("epoll_create1");
+  if (static_cast<int>(_server_fd) < 0) {
+    std::perror("socket");
     std::exit(EXIT_FAILURE);
   }
 
-  if (static_cast<int>(_server_fd) < 0) {
-    std::perror("socket");
+  if (static_cast<int>(_epoll_fd) < 0) {
+    std::perror("epoll_create1");
     std::exit(EXIT_FAILURE);
   }
 
