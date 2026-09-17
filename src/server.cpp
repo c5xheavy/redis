@@ -92,30 +92,32 @@ void server::serve() {
     assert(nfds >= 0);
     for (std::size_t i = 0; i < static_cast<std::size_t>(nfds); ++i) {
       if (_events.at(i).data.fd == static_cast<int>(_server_fd)) {
-        std::cout << "Connecting client...\n";
-        int client_fd = -1;
-        do {
-          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-          client_fd = accept4(static_cast<int>(_server_fd), reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len,
-                              SOCK_NONBLOCK);
-        } while (client_fd < 0 && errno == EINTR);
-        if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          std::perror("accept");
-          std::exit(EXIT_FAILURE);
-        }
-        if (client_fd < 0) {
-          continue;
-        }
-        std::cout << "Client connected\n";
+        if (_events.at(i).events == EPOLLIN) {
+          std::cout << "Connecting client...\n";
+          int client_fd = -1;
+          do {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+            client_fd = accept4(static_cast<int>(_server_fd), reinterpret_cast<sockaddr*>(&client_addr),
+                                &client_addr_len, SOCK_NONBLOCK);
+          } while (client_fd < 0 && errno == EINTR);
+          if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            std::perror("accept");
+            std::exit(EXIT_FAILURE);
+          }
+          if (client_fd < 0) {
+            continue;
+          }
+          std::cout << "Client connected\n";
 
-        [[maybe_unused]] auto try_emplace_rv =
-            _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
-        assert(try_emplace_rv.second);
-        _ev.events = EPOLLIN;
-        _ev.data.fd = client_fd;
-        if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
-          std::perror("epoll_ctl: _client_fd");
-          std::exit(EXIT_FAILURE);
+          [[maybe_unused]] auto try_emplace_rv =
+              _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
+          assert(try_emplace_rv.second);
+          _ev.events = EPOLLIN;
+          _ev.data.fd = client_fd;
+          if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
+            std::perror("epoll_ctl: _client_fd");
+            std::exit(EXIT_FAILURE);
+          }
         }
       } else {
         const int client_fd = _events.at(i).data.fd;
