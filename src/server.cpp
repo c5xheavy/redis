@@ -165,7 +165,6 @@ ssize_t server::read_input(int client_fd) {
 }
 
 ssize_t server::send_output(int client_fd) {
-  epoll_event ev{};
   auto& [connection, parser] = _connections.at(client_fd);
 
   const std::span<const char> span = connection.get_bytes_for_send();
@@ -179,9 +178,9 @@ ssize_t server::send_output(int client_fd) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
         _connections.erase(client_fd);
       } else {
-        ev.events = EPOLLIN | EPOLLOUT;
-        ev.data.fd = client_fd;
-        if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+        _ev.events = EPOLLIN | EPOLLOUT;
+        _ev.data.fd = client_fd;
+        if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
           std::perror("epoll_ctl: client_fd");
           std::exit(EXIT_FAILURE);
         }
@@ -191,9 +190,9 @@ ssize_t server::send_output(int client_fd) {
     assert(bytes_send >= 0);
     connection.erase_bytes_after_send(static_cast<std::size_t>(bytes_send));
     if (connection.get_bytes_for_send().empty()) {
-      ev.events = EPOLLIN;
-      ev.data.fd = client_fd;
-      if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+      _ev.events = EPOLLIN;
+      _ev.data.fd = client_fd;
+      if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
         std::perror("epoll_ctl: client_fd");
         std::exit(EXIT_FAILURE);
       }
