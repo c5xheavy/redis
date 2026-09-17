@@ -36,6 +36,10 @@ public:
   unique_fd(const unique_fd&) = delete;
   unique_fd& operator=(const unique_fd&) = delete;
 
+  explicit operator int() const {
+    return _fd;
+  }
+
 private:
   void close_fd() noexcept {
     if (close(_fd) != 0 && errno != EINTR) {

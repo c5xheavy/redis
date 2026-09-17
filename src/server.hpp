@@ -11,6 +11,7 @@
 #include "connection.hpp"
 #include "defines.hpp"
 #include "parser.hpp"
+#include "unique_fd.hpp"
 
 namespace redis {
 
@@ -19,8 +20,7 @@ public:
   //TODO(amir): singleton
 
   server();
-
-  ~server();
+  ~server() = default;
 
   server(const server&) = delete;
   server& operator=(const server&) = delete;
@@ -38,8 +38,8 @@ private:
   std::map<int, std::pair<redis::connection, redis::parser>> _connections;
   epoll_event _ev{};
   std::array<epoll_event, MAX_EVENTS> _events{};
-  int _epoll_fd;
-  int _server_fd;
+  unique_fd _epoll_fd;
+  unique_fd _server_fd;
 };
 
 }  // namespace redis
