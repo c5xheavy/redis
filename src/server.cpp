@@ -15,6 +15,7 @@
 #include <iostream>
 #include <map>
 #include <span>
+#include <system_error>
 #include <utility>
 
 #include "connection.hpp"
@@ -26,19 +27,16 @@ namespace redis {
 
 server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_STREAM, 0)} {
   if (static_cast<int>(_server_fd) < 0) {
-    std::perror("socket");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "socket: _server_fd");
   }
 
   if (static_cast<int>(_epoll_fd) < 0) {
-    std::perror("epoll_create1");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "epoll_create1: _epoll_fd");
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
   if (fcntl(static_cast<int>(_server_fd), F_SETFL, O_NONBLOCK) != 0) {
-    std::perror("fcntl");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "fcntl: _server_fd");
   }
 
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -46,8 +44,7 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
   int reuse = 1;
   // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
   if (setsockopt(static_cast<int>(_server_fd), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-    std::perror("setsockopt");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "setsockopt: _server_fd");
   }
 
   struct sockaddr_in server_addr {};
@@ -57,21 +54,18 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
   if (bind(static_cast<int>(_server_fd), reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
-    std::perror("bind");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "bind: _server_fd");
   }
 
   const int connection_backlog = 5;
   if (listen(static_cast<int>(_server_fd), connection_backlog) != 0) {
-    std::perror("listen");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "listen: _server_fd");
   }
 
   _ev.events = EPOLLIN;
   _ev.data.fd = static_cast<int>(_server_fd);
   if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_ADD, static_cast<int>(_server_fd), &_ev) != 0) {
-    std::perror("epoll_ctl: _server_fd");
-    std::exit(EXIT_FAILURE);
+    throw std::system_error(errno, std::system_category(), "epoll_ctl: _epoll_fd");
   }
 }
 
