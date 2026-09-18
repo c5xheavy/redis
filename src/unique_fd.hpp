@@ -42,9 +42,14 @@ public:
 
 private:
   void close_fd() noexcept {
-    if (close(_fd) != 0 && errno != EINTR) {
-      std::perror("close: unique_fd");
-      std::abort();
+    if (close(_fd) != 0) {
+      const int close_errno = errno;
+      if (close_errno != EINTR) {
+        std::perror("close: unique_fd");
+      }
+      if (close_errno == EBADF) {
+        std::abort();
+      }
     }
     _fd = -1;
   }
