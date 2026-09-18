@@ -62,21 +62,23 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
     throw std::system_error(errno, std::system_category(), "listen: _server_fd");
   }
 
-  _ev.events = EPOLLIN;
-  _ev.data.fd = _server_fd.native_handle();
-  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, _server_fd.native_handle(), &_ev) != 0) {
+  epoll_event ev{};
+  ev.events = EPOLLIN;
+  ev.data.fd = _server_fd.native_handle();
+  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, _server_fd.native_handle(), &ev) != 0) {
     throw std::system_error(errno, std::system_category(), "epoll_ctl: _epoll_fd");
   }
 }
 
 void server::serve() {
+  std::array<epoll_event, MAX_EVENTS> events{};
   struct sockaddr_in client_addr {};
   socklen_t client_addr_len = sizeof(client_addr);
 
   while (true) {
     int nfds = 0;
     do {
-      nfds = epoll_wait(_epoll_fd.native_handle(), _events.data(), MAX_EVENTS, -1);
+      nfds = epoll_wait(_epoll_fd.native_handle(), events.data(), MAX_EVENTS, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       std::perror("epoll_wait");
@@ -85,8 +87,8 @@ void server::serve() {
 
     assert(nfds >= 0);
     for (std::size_t i = 0; i < static_cast<std::size_t>(nfds); ++i) {
-      if (_events.at(i).data.fd == _server_fd.native_handle()) {
-        if (_events.at(i).events == EPOLLIN) {
+      if (events.at(i).data.fd == _server_fd.native_handle()) {
+        if (events.at(i).events == EPOLLIN) {
           std::cout << "Connecting client...\n";
           int client_fd = -1;
           do {
@@ -106,15 +108,16 @@ void server::serve() {
           [[maybe_unused]] auto try_emplace_rv =
               _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
           assert(try_emplace_rv.second);
-          _ev.events = EPOLLIN;
-          _ev.data.fd = client_fd;
-          if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
+          epoll_event ev{};
+          ev.events = EPOLLIN;
+          ev.data.fd = client_fd;
+          if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, client_fd, &ev) != 0) {
             std::perror("epoll_ctl: _client_fd");
             std::exit(EXIT_FAILURE);
           }
         }
       } else {
-        const int client_fd = _events.at(i).data.fd;
+        const int client_fd = events.at(i).data.fd;
 
         read_input(client_fd);
 
@@ -172,9 +175,10 @@ ssize_t server::send_output(int client_fd) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
         _connections.erase(client_fd);
       } else {
-        _ev.events = EPOLLIN | EPOLLOUT;
-        _ev.data.fd = client_fd;
-        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
+        epoll_event ev{};
+        ev.events = EPOLLIN | EPOLLOUT;
+        ev.data.fd = client_fd;
+        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
           std::perror("epoll_ctl: client_fd");
           std::exit(EXIT_FAILURE);
         }
@@ -184,9 +188,10 @@ ssize_t server::send_output(int client_fd) {
     assert(bytes_send >= 0);
     connection.erase_bytes_after_send(static_cast<std::size_t>(bytes_send));
     if (connection.get_bytes_for_send().empty()) {
-      _ev.events = EPOLLIN;
-      _ev.data.fd = client_fd;
-      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
+      epoll_event ev{};
+      ev.events = EPOLLIN;
+      ev.data.fd = client_fd;
+      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
         std::perror("epoll_ctl: client_fd");
         std::exit(EXIT_FAILURE);
       }
