@@ -26,16 +26,16 @@
 namespace redis {
 
 server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_STREAM, 0)} {
-  if (static_cast<int>(_server_fd) < 0) {
+  if (_server_fd.native_handle() < 0) {
     throw std::system_error(errno, std::system_category(), "socket: _server_fd");
   }
 
-  if (static_cast<int>(_epoll_fd) < 0) {
+  if (_epoll_fd.native_handle() < 0) {
     throw std::system_error(errno, std::system_category(), "epoll_create1: _epoll_fd");
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative
-  if (fcntl(static_cast<int>(_server_fd), F_SETFL, O_NONBLOCK) != 0) {
+  if (fcntl(_server_fd.native_handle(), F_SETFL, O_NONBLOCK) != 0) {
     throw std::system_error(errno, std::system_category(), "fcntl: _server_fd");
   }
 
@@ -43,7 +43,7 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
   // ensures that we don't run into 'Address already in use' errors
   int reuse = 1;
   // NOLINTNEXTLINE(misc-include-cleaner): false positive — glibc defines these in bits/socket*.h; <sys/socket.h> is the real provider and is included
-  if (setsockopt(static_cast<int>(_server_fd), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+  if (setsockopt(_server_fd.native_handle(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
     throw std::system_error(errno, std::system_category(), "setsockopt: _server_fd");
   }
 
@@ -53,18 +53,18 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
   server_addr.sin_port = htons(REDIS_PORT);
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-  if (bind(static_cast<int>(_server_fd), reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
+  if (bind(_server_fd.native_handle(), reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
     throw std::system_error(errno, std::system_category(), "bind: _server_fd");
   }
 
   const int connection_backlog = 5;
-  if (listen(static_cast<int>(_server_fd), connection_backlog) != 0) {
+  if (listen(_server_fd.native_handle(), connection_backlog) != 0) {
     throw std::system_error(errno, std::system_category(), "listen: _server_fd");
   }
 
   _ev.events = EPOLLIN;
-  _ev.data.fd = static_cast<int>(_server_fd);
-  if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_ADD, static_cast<int>(_server_fd), &_ev) != 0) {
+  _ev.data.fd = _server_fd.native_handle();
+  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, _server_fd.native_handle(), &_ev) != 0) {
     throw std::system_error(errno, std::system_category(), "epoll_ctl: _epoll_fd");
   }
 }
@@ -76,7 +76,7 @@ void server::serve() {
   while (true) {
     int nfds = 0;
     do {
-      nfds = epoll_wait(static_cast<int>(_epoll_fd), _events.data(), MAX_EVENTS, -1);
+      nfds = epoll_wait(_epoll_fd.native_handle(), _events.data(), MAX_EVENTS, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       std::perror("epoll_wait");
@@ -85,14 +85,14 @@ void server::serve() {
 
     assert(nfds >= 0);
     for (std::size_t i = 0; i < static_cast<std::size_t>(nfds); ++i) {
-      if (_events.at(i).data.fd == static_cast<int>(_server_fd)) {
+      if (_events.at(i).data.fd == _server_fd.native_handle()) {
         if (_events.at(i).events == EPOLLIN) {
           std::cout << "Connecting client...\n";
           int client_fd = -1;
           do {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
-            client_fd = accept4(static_cast<int>(_server_fd), reinterpret_cast<sockaddr*>(&client_addr),
-                                &client_addr_len, SOCK_NONBLOCK);
+            client_fd = accept4(_server_fd.native_handle(), reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len,
+                                SOCK_NONBLOCK);
           } while (client_fd < 0 && errno == EINTR);
           if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
             std::perror("accept");
@@ -108,7 +108,7 @@ void server::serve() {
           assert(try_emplace_rv.second);
           _ev.events = EPOLLIN;
           _ev.data.fd = client_fd;
-          if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
+          if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, client_fd, &_ev) != 0) {
             std::perror("epoll_ctl: _client_fd");
             std::exit(EXIT_FAILURE);
           }
@@ -174,7 +174,7 @@ ssize_t server::send_output(int client_fd) {
       } else {
         _ev.events = EPOLLIN | EPOLLOUT;
         _ev.data.fd = client_fd;
-        if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
+        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
           std::perror("epoll_ctl: client_fd");
           std::exit(EXIT_FAILURE);
         }
@@ -186,7 +186,7 @@ ssize_t server::send_output(int client_fd) {
     if (connection.get_bytes_for_send().empty()) {
       _ev.events = EPOLLIN;
       _ev.data.fd = client_fd;
-      if (epoll_ctl(static_cast<int>(_epoll_fd), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
+      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &_ev) != 0) {
         std::perror("epoll_ctl: client_fd");
         std::exit(EXIT_FAILURE);
       }

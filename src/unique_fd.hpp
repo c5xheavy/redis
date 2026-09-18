@@ -36,7 +36,7 @@ public:
   unique_fd(const unique_fd&) = delete;
   unique_fd& operator=(const unique_fd&) = delete;
 
-  explicit operator int() const {
+  [[nodiscard]] int native_handle() const {
     return _fd;
   }
 
