@@ -6,6 +6,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <array>
 #include <cassert>
@@ -25,7 +26,14 @@
 
 namespace redis {
 
-server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_STREAM, 0)} {
+server::server()
+    : _epoll_fd{epoll_create1(0)},
+      _server_fd{socket(AF_INET, SOCK_STREAM, 0)},
+      _spare_fd{dup(_epoll_fd.native_handle())} {
+  if (_spare_fd.native_handle() < 0) {
+    throw std::system_error(errno, std::system_category(), "dup: _epoll_fd: _spare_fd");
+  }
+
   if (_server_fd.native_handle() < 0) {
     throw std::system_error(errno, std::system_category(), "socket: _server_fd");
   }
@@ -96,11 +104,35 @@ void server::serve() {
             client_fd = accept4(_server_fd.native_handle(), reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len,
                                 SOCK_NONBLOCK);
           } while (client_fd < 0 && errno == EINTR);
-          if (client_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            std::perror("accept");
-            std::exit(EXIT_FAILURE);
-          }
           if (client_fd < 0) {
+            const int accept4_errno = errno;
+            if (accept4_errno != EAGAIN && accept4_errno != EWOULDBLOCK) {
+              std::perror("accept4: _server_fd: client_fd");
+              _spare_fd.close_fd();
+              do {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): canonical sockaddr idiom of the BSD socket API
+                _spare_fd = unique_fd{accept4(_server_fd.native_handle(), reinterpret_cast<sockaddr*>(&client_addr),
+                                              &client_addr_len, SOCK_NONBLOCK)};
+              } while (_spare_fd.native_handle() < 0 && errno == EINTR);
+              if (_spare_fd.native_handle() < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                  std::perror("accept4: _server_fd: _spare_fd");
+                  epoll_event ev{};
+                  ev.events = 0;
+                  ev.data.fd = _server_fd.native_handle();
+                  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
+                    std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+                  }
+                }
+              } else {
+                _spare_fd.close_fd();
+              }
+              _spare_fd = unique_fd{dup(_epoll_fd.native_handle())};
+              if (_spare_fd.native_handle() < 0) {
+                std::perror("dup: _epoll_fd: _spare_fd");
+                std::abort();
+              }
+            }
             continue;
           }
           std::cout << "Client connected\n";
@@ -142,12 +174,24 @@ ssize_t server::read_input(int client_fd) {
     if (errno != EAGAIN && errno != EWOULDBLOCK) {
       std::cout << "Closing client " << client_fd << " after failed recv\n";
       _connections.erase(client_fd);
+      epoll_event ev{};
+      ev.events = EPOLLIN;
+      ev.data.fd = _server_fd.native_handle();
+      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
+        std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+      }
     }
     return bytes_recv;
   }
   if (bytes_recv == 0) {
     std::cout << "Client " << client_fd << " closed connection\n";
     _connections.erase(client_fd);
+    epoll_event ev{};
+    ev.events = EPOLLIN;
+    ev.data.fd = _server_fd.native_handle();
+    if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
+      std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+    }
     return bytes_recv;
   }
 
@@ -174,6 +218,12 @@ ssize_t server::send_output(int client_fd) {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
         _connections.erase(client_fd);
+        epoll_event ev{};
+        ev.events = EPOLLIN;
+        ev.data.fd = _server_fd.native_handle();
+        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
+          std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+        }
       } else {
         epoll_event ev{};
         ev.events = EPOLLIN | EPOLLOUT;

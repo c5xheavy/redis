@@ -35,6 +35,7 @@ private:
   std::map<int, std::pair<redis::connection, redis::parser>> _connections;
   unique_fd _epoll_fd;
   unique_fd _server_fd;
+  unique_fd _spare_fd;
 };
 
 }  // namespace redis
