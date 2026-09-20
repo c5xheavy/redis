@@ -66,7 +66,7 @@ server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_
   ev.events = EPOLLIN;
   ev.data.fd = _server_fd.native_handle();
   if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, _server_fd.native_handle(), &ev) != 0) {
-    throw std::system_error(errno, std::system_category(), "epoll_ctl: _epoll_fd");
+    throw std::system_error(errno, std::system_category(), "epoll_ctl: _epoll_fd: EPOLL_CTL_ADD: _server_fd");
   }
 }
 
@@ -81,7 +81,7 @@ void server::serve() {
       nfds = epoll_wait(_epoll_fd.native_handle(), events.data(), MAX_EVENTS, -1);
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
-      std::perror("epoll_wait");
+      std::perror("epoll_wait: _epoll_fd");
       std::exit(EXIT_FAILURE);
     }
 
@@ -112,7 +112,7 @@ void server::serve() {
           ev.events = EPOLLIN;
           ev.data.fd = client_fd;
           if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, client_fd, &ev) != 0) {
-            std::perror("epoll_ctl: _client_fd");
+            std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_ADD: client_fd");
             std::exit(EXIT_FAILURE);
           }
         }
@@ -179,7 +179,7 @@ ssize_t server::send_output(int client_fd) {
         ev.events = EPOLLIN | EPOLLOUT;
         ev.data.fd = client_fd;
         if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-          std::perror("epoll_ctl: client_fd");
+          std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
           std::exit(EXIT_FAILURE);
         }
       }
@@ -192,7 +192,7 @@ ssize_t server::send_output(int client_fd) {
       ev.events = EPOLLIN;
       ev.data.fd = client_fd;
       if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-        std::perror("epoll_ctl: client_fd");
+        std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
         std::exit(EXIT_FAILURE);
       }
     }
