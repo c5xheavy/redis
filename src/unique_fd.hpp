@@ -21,23 +21,25 @@ public:
     }
   }
 
-  unique_fd(unique_fd&& other) noexcept : _fd{std::exchange(other._fd, -1)} {}
-
-  unique_fd& operator=(unique_fd&& other) noexcept {
-    if (this == &other) {
-      return *this;
-    }
-    if (_fd != -1) {
-      close_fd();
-    }
-    _fd = std::exchange(other._fd, -1);
-    return *this;
-  }
-
   unique_fd(const unique_fd&) = delete;
   unique_fd& operator=(const unique_fd&) = delete;
 
-  [[nodiscard]] int native_handle() const {
+  unique_fd(unique_fd&& other) noexcept : unique_fd() {
+    swap(*this, other);
+  }
+
+  unique_fd& operator=(unique_fd&& other) noexcept {
+    unique_fd tmp{std::move(other)};
+    swap(*this, tmp);
+    return *this;
+  }
+
+  friend void swap(unique_fd& first, unique_fd& second) noexcept {
+    using std::swap;
+    swap(first._fd, second._fd);
+  }
+
+  [[nodiscard]] int native_handle() const noexcept {
     return _fd;
   }
 
