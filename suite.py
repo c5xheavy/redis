@@ -284,6 +284,15 @@ def more_clients_than_fd_limit(p):
 more_clients_than_fd_limit.expects_errors = True  # "accept4: ... Too many open files" is the point
 
 
+def uppercase_PING(p):
+    # redis folds command names; redis-benchmark and redis-cli send PING as typed.
+    s = conn(); s.sendall(b"*1\r\n$4\r\nPING\r\n")
+    expect(recv_until(s, len(PONG)) == PONG, "no PONG for uppercase PING")
+    s.sendall(b"PiNg\r\n")
+    expect(recv_until(s, len(PONG)) == PONG, "no PONG for mixed-case inline PiNg")
+    s.close(); alive(p)
+
+
 def busy_port_exits_with_failure(p):
     # The failure code is what serve.sh (exec) and a supervisor see; 0 would read as success.
     r = subprocess.run(LAUNCH, capture_output=True, text=True, timeout=10)
@@ -314,12 +323,12 @@ SCENARIOS = [
     hygiene_after_disconnects,
     unknown_command_gets_err_reply,
     more_clients_than_fd_limit,
+    uppercase_PING,
     busy_port_exits_with_failure,
 ]
 
 # Deliberately off until the matching PLAN.md item is done. Move up when it lands.
 SKIPPED = [
-    ("uppercase_PING", "command names are case-sensitive; redis folds them (PLAN: command dispatcher)"),
     ("empty_bulk_string_arg", "needs a non-ping command to carry it"),
     ("inline_empty_line_is_noop", "bare CRLF gets -ERR unknown command here; redis is silent. Decide which"),
     ("protocol_error_closes_only_that_client", "PLAN, in progress: '%' for '$' still kills the process (rc 0)"),
