@@ -12,8 +12,14 @@ assert report. Exit code: 0 = all green, 1 = failures (usable as a gate).
 
 SKIPPED at the bottom lists scenarios that are deliberately off until the
 matching PLAN.md item is done. Move them up when the item lands.
+
+A scenario also fails if the server log contains a syscall error line
+("epoll_ctl: ...", "accept4: ...", "close: ...") it did not declare with
+`fn.expects_errors = True`. more_clients_than_fd_limit needs prlimit (util-linux).
 """
 import os
+import re
+import select
 import signal
 import socket
 import struct
@@ -25,6 +31,8 @@ LAUNCH = sys.argv[1:] or ["./build-asan/redis"]
 PORT = 6379
 PING = b"*1\r\n$4\r\nping\r\n"
 PONG = b"+PONG\r\n"
+ERR_UNKNOWN = b"-ERR unknown command\r\n"
+SYSCALL_ERR = re.compile(r"^(epoll_ctl|epoll_wait|accept4|close|dup|bind|listen|socket|fcntl|setsockopt): ")
 
 
 class Fail(Exception):
@@ -242,6 +250,49 @@ def hygiene_after_disconnects(p):
     alive(p)
 
 
+def unknown_command_gets_err_reply(p):
+    s = conn(); s.sendall(b"*2\r\n$4\r\necho\r\n$2\r\nhi\r\n")
+    expect(recv_until(s, len(ERR_UNKNOWN)) == ERR_UNKNOWN, "no -ERR for an unknown command")
+    s.sendall(PING)  # the error must not cost the connection
+    expect(recv_until(s, len(PONG)) == PONG, "connection did not survive the -ERR")
+    s.close(); alive(p)
+
+
+def more_clients_than_fd_limit(p):
+    # Lower the live server's fd limit instead of restarting it under ulimit.
+    subprocess.run(["prlimit", "--pid", str(p.pid), "--nofile=32:32"], check=True)
+    socks = []
+    for _ in range(40):
+        try:
+            socks.append(conn())
+        except OSError:
+            break
+    time.sleep(0.3)
+    readable, _, _ = select.select(socks, [], [], 0.5)
+    refused = [s for s in readable if s.recv(1) == b""]  # accepted and closed at once
+    held = [s for s in socks if s not in refused]
+    expect(refused, "nobody was refused: the fd limit was never hit")
+    expect(held, "nobody was served")
+    alive(p)
+    before = cpu_ticks(p.pid); time.sleep(1.2); after = cpu_ticks(p.pid)
+    expect(after - before < 8, f"busy loop while out of fds: {after - before} ticks")
+    held.pop().close(); time.sleep(0.3)  # one slot back: the listener must serve again
+    serves(p)
+    for s in socks:
+        s.close()
+    alive(p)
+more_clients_than_fd_limit.expects_errors = True  # "accept4: ... Too many open files" is the point
+
+
+def busy_port_exits_with_failure(p):
+    # The failure code is what serve.sh (exec) and a supervisor see; 0 would read as success.
+    r = subprocess.run(LAUNCH, capture_output=True, text=True, timeout=10)
+    out = r.stdout + r.stderr
+    expect(r.returncode == 1, f"second instance exited with {r.returncode}, expected 1")
+    expect("Address already in use" in out, f"no EADDRINUSE diagnosis: {out!r}")
+    alive(p); serves(p)
+
+
 SCENARIOS = [
     single_ping,
     five_sequential_same_conn,
@@ -261,15 +312,20 @@ SCENARIOS = [
     slow_reader_gets_all_replies,
     sigstop_sigcont,
     hygiene_after_disconnects,
+    unknown_command_gets_err_reply,
+    more_clients_than_fd_limit,
+    busy_port_exits_with_failure,
 ]
 
 # Deliberately off until the matching PLAN.md item is done. Move up when it lands.
 SKIPPED = [
-    ("unknown_command_gets_err_reply", "executor is a ping-only stub"),
-    ("uppercase_PING", "executor: command lookup is case-sensitive stub"),
+    ("uppercase_PING", "command names are case-sensitive; redis folds them (PLAN: command dispatcher)"),
     ("empty_bulk_string_arg", "needs a non-ping command to carry it"),
-    ("inline_empty_line_is_noop", "executor stub would assert on the empty command"),
-    ("more_clients_than_fd_limit", "PLAN: accept EMFILE handling deferred"),
+    ("inline_empty_line_is_noop", "bare CRLF gets -ERR unknown command here; redis is silent. Decide which"),
+    ("protocol_error_closes_only_that_client", "PLAN, in progress: '%' for '$' still kills the process (rc 0)"),
+    ("null_array_is_noop", "PLAN, in progress: *-1 trips assert(ec == errc{}) in parser.cpp:94"),
+    ("junk_without_crlf_is_linear", "PLAN: deque -> ring buffer; 512 KB of junk costs 2.58 s CPU today"),
+    ("input_buffer_is_bounded", "PLAN: client-query-buffer-limit"),
 ]
 
 # -----------------------------------------------------------------------------
@@ -299,6 +355,9 @@ def main():
             ok, detail = False, f"log has a report: {reports[0]!r}"
         if not ok and reports and "log" not in detail:
             detail += f"   [log: {reports[0]!r}]" if reports else ""
+        errs = [l for l in log.splitlines() if SYSCALL_ERR.match(l)]
+        if ok and errs and not getattr(fn, "expects_errors", False):
+            ok, detail = False, f"unexpected syscall error in log: {errs[0]!r}"
         print(f'{"OK  " if ok else "FAIL"} {fn.__name__:32s} {detail}')
         failures += 0 if ok else 1
     for name, why in SKIPPED:
