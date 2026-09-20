@@ -173,25 +173,13 @@ ssize_t server::read_input(int client_fd) {
   if (bytes_recv < 0) {
     if (errno != EAGAIN && errno != EWOULDBLOCK) {
       std::cout << "Closing client " << client_fd << " after failed recv\n";
-      _connections.erase(client_fd);
-      epoll_event ev{};
-      ev.events = EPOLLIN;
-      ev.data.fd = _server_fd.native_handle();
-      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
-        std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
-      }
+      close_client(client_fd);
     }
     return bytes_recv;
   }
   if (bytes_recv == 0) {
     std::cout << "Client " << client_fd << " closed connection\n";
-    _connections.erase(client_fd);
-    epoll_event ev{};
-    ev.events = EPOLLIN;
-    ev.data.fd = _server_fd.native_handle();
-    if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
-      std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
-    }
+    close_client(client_fd);
     return bytes_recv;
   }
 
@@ -217,13 +205,7 @@ ssize_t server::send_output(int client_fd) {
     if (bytes_send < 0) {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
-        _connections.erase(client_fd);
-        epoll_event ev{};
-        ev.events = EPOLLIN;
-        ev.data.fd = _server_fd.native_handle();
-        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
-          std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
-        }
+        close_client(client_fd);
       } else {
         epoll_event ev{};
         ev.events = EPOLLIN | EPOLLOUT;
@@ -249,6 +231,16 @@ ssize_t server::send_output(int client_fd) {
     return bytes_send;
   }
   return 0;
+}
+
+void server::close_client(int client_fd) {
+  _connections.erase(client_fd);
+  epoll_event ev{};
+  ev.events = EPOLLIN;
+  ev.data.fd = _server_fd.native_handle();
+  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
+    std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+  }
 }
 
 }  // namespace redis
