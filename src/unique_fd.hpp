@@ -40,7 +40,6 @@ public:
     return _fd;
   }
 
-private:
   void close_fd() noexcept {
     if (close(_fd) != 0) {
       const int close_errno = errno;
@@ -54,6 +53,7 @@ private:
     _fd = -1;
   }
 
+private:
   int _fd;
 };
 
