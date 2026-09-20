@@ -1,7 +1,6 @@
 #ifndef MY_REDIS_SRC_EXECUTOR_HPP
 #define MY_REDIS_SRC_EXECUTOR_HPP
 
-#include <cassert>
 #include <string>
 #include <vector>
 
@@ -10,14 +9,11 @@ namespace redis {
 class executor {
 public:
   //TODO(amir): singleton
-  static std::string execute(const std::vector<std::string>& command) {
-    if (command.size() == 1 && command[0] == "ping") {
-      return "+PONG\r\n";
-    }
-    return "-ERR unknown command\r\n";
-  }
+  static std::string execute(const std::vector<std::string>& command);
 
 private:
+  static std::string str_tolower(std::string s);
+
   //TODO(amir): state
 };
 
