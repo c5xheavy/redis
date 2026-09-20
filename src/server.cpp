@@ -26,20 +26,19 @@
 
 namespace redis {
 
-server::server()
-    : _epoll_fd{epoll_create1(0)},
-      _server_fd{socket(AF_INET, SOCK_STREAM, 0)},
-      _spare_fd{dup(_epoll_fd.native_handle())} {
-  if (_spare_fd.native_handle() < 0) {
-    throw std::system_error(errno, std::system_category(), "dup: _epoll_fd: _spare_fd");
-  }
-
+server::server() : _epoll_fd{epoll_create1(0)}, _server_fd{socket(AF_INET, SOCK_STREAM, 0)} {
+  // check in reverse order because errno is set by the last failed syscall
   if (_server_fd.native_handle() < 0) {
     throw std::system_error(errno, std::system_category(), "socket: _server_fd");
   }
 
   if (_epoll_fd.native_handle() < 0) {
     throw std::system_error(errno, std::system_category(), "epoll_create1: _epoll_fd");
+  }
+
+  _spare_fd = unique_fd{dup(_epoll_fd.native_handle())};
+  if (_spare_fd.native_handle() < 0) {
+    throw std::system_error(errno, std::system_category(), "dup: _epoll_fd: _spare_fd");
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl is a vararg by signature, there is no non-vararg alternative

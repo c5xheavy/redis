@@ -12,6 +12,7 @@ namespace redis {
 
 class unique_fd {
 public:
+  unique_fd() = default;
   explicit unique_fd(int fd) : _fd{fd} {}
 
   ~unique_fd() {
@@ -54,7 +55,7 @@ public:
   }
 
 private:
-  int _fd;
+  int _fd = -1;
 };
 
 }  // namespace redis

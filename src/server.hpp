@@ -35,8 +35,8 @@ private:
   void close_client(int client_fd);
 
   std::map<int, std::pair<redis::connection, redis::parser>> _connections;
-  unique_fd _epoll_fd;
-  unique_fd _server_fd;
+  const unique_fd _epoll_fd;
+  const unique_fd _server_fd;
   unique_fd _spare_fd;
 };
 
