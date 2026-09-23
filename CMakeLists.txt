@@ -13,8 +13,7 @@ add_executable(redis ${SOURCE_FILES})
 
 target_link_libraries(redis PRIVATE Threads::Threads)
 
-# Local-only instrumented builds. CodeCrafters configures without CMAKE_BUILD_TYPE
-# (see .codecrafters/compile.sh), so none of these branches run in the remote build.
+# Local-only instrumented builds:
 #   cmake -B build-asan    -DCMAKE_BUILD_TYPE=Asan    && cmake --build build-asan
 #   cmake -B build-tsan    -DCMAKE_BUILD_TYPE=Tsan    && cmake --build build-tsan
 #     GCC 13's libtsan dies with "unexpected memory mapping" under this kernel's ASLR range.
