@@ -137,8 +137,7 @@ void server::serve() {
           }
           std::cout << "Client connected\n";
 
-          [[maybe_unused]] auto try_emplace_rv =
-              _connections.try_emplace(client_fd, std::make_pair(redis::connection{client_fd}, redis::parser{}));
+          [[maybe_unused]] auto try_emplace_rv = _clients.try_emplace(client_fd, client{client_fd});
           assert(try_emplace_rv.second);
           epoll_event ev{};
           ev.events = EPOLLIN;
@@ -151,13 +150,18 @@ void server::serve() {
       } else {
         const int client_fd = events.at(i).data.fd;
 
-        read_input(client_fd);
+        if ((events.at(i).events & EPOLLIN) != 0U) {
+          read_input(client_fd);
+        }
 
-        if (_connections.find(client_fd) == _connections.end()) {
+        auto it = _clients.find(client_fd);
+        if (it == _clients.end()) {
           continue;
         }
 
-        send_output(client_fd);
+        if (!it->second.epollout_armed || (events.at(i).events & EPOLLOUT) != 0U) {
+          send_output(client_fd);
+        }
       }
     }
   }
@@ -183,8 +187,7 @@ ssize_t server::read_input(int client_fd) {
     return bytes_recv;
   }
 
-  auto& [connection, parser] = _connections.at(client_fd);
-  assert(bytes_recv >= 0);
+  auto& [connection, parser, epollout_armed] = _clients.at(client_fd);
   connection.append_input_buffer(recv_buf, static_cast<std::size_t>(bytes_recv));
   parser.parse_input(connection);
   while (parser.has_command()) {
@@ -194,7 +197,7 @@ ssize_t server::read_input(int client_fd) {
 }
 
 ssize_t server::send_output(int client_fd) {
-  auto& [connection, parser] = _connections.at(client_fd);
+  auto& [connection, parser, epollout_armed] = _clients.at(client_fd);
 
   const std::span<const char> span = connection.get_bytes_for_send();
   if (!span.empty()) {
@@ -206,35 +209,48 @@ ssize_t server::send_output(int client_fd) {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         std::cout << "Closing client " << client_fd << " after failed send\n";
         close_client(client_fd);
-      } else {
-        epoll_event ev{};
-        ev.events = EPOLLIN | EPOLLOUT;
-        ev.data.fd = client_fd;
-        if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-          std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
-          std::abort();
-        }
+      } else if (!epollout_armed) {
+        arm_epollout(client_fd);
+        epollout_armed = true;
       }
       return bytes_send;
     }
-    assert(bytes_send >= 0);
+    if (!epollout_armed && static_cast<std::size_t>(bytes_send) < span.size()) {
+      arm_epollout(client_fd);
+      epollout_armed = true;
+    }
     connection.erase_bytes_after_send(static_cast<std::size_t>(bytes_send));
-    if (connection.get_bytes_for_send().empty()) {
-      epoll_event ev{};
-      ev.events = EPOLLIN;
-      ev.data.fd = client_fd;
-      if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
-        std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
-        std::abort();
-      }
+    if (epollout_armed && connection.get_bytes_for_send().empty()) {
+      disarm_epollout(client_fd);
+      epollout_armed = false;
     }
     return bytes_send;
   }
   return 0;
 }
 
+void server::arm_epollout(int client_fd) {
+  epoll_event ev{};
+  ev.events = EPOLLIN | EPOLLOUT;
+  ev.data.fd = client_fd;
+  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+    std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
+    std::abort();
+  }
+}
+
+void server::disarm_epollout(int client_fd) {
+  epoll_event ev{};
+  ev.events = EPOLLIN;
+  ev.data.fd = client_fd;
+  if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
+    std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
+    std::abort();
+  }
+}
+
 void server::close_client(int client_fd) {
-  _connections.erase(client_fd);
+  _clients.erase(client_fd);
   epoll_event ev{};
   ev.events = EPOLLIN;
   ev.data.fd = _server_fd.native_handle();

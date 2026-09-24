@@ -4,7 +4,6 @@
 #include <sys/types.h>
 
 #include <map>
-#include <utility>
 
 #include "connection.hpp"
 #include "parser.hpp"
@@ -13,6 +12,15 @@
 namespace redis {
 
 class server {
+private:
+  struct client {
+    explicit client(int client_fd) : connection{client_fd} {}
+
+    redis::connection connection;
+    redis::parser parser;
+    bool epollout_armed = false;
+  };
+
 public:
   //TODO(amir): singleton
 
@@ -27,14 +35,14 @@ public:
 
   [[noreturn]] void serve();
 
-  ssize_t read_input(int client_fd);
-
-  ssize_t send_output(int client_fd);
-
 private:
+  ssize_t read_input(int client_fd);
+  ssize_t send_output(int client_fd);
+  void arm_epollout(int client_fd);
+  void disarm_epollout(int client_fd);
   void close_client(int client_fd);
 
-  std::map<int, std::pair<redis::connection, redis::parser>> _connections;
+  std::map<int, client> _clients;
   const unique_fd _epoll_fd;
   const unique_fd _server_fd;
   unique_fd _spare_fd;
