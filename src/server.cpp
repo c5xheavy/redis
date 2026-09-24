@@ -145,7 +145,7 @@ void server::serve() {
           ev.data.fd = client_fd;
           if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_ADD, client_fd, &ev) != 0) {
             std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_ADD: client_fd");
-            std::exit(EXIT_FAILURE);
+            close_client(client_fd);
           }
         }
       } else {
