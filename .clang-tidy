@@ -13,7 +13,7 @@
 #   readability-function-cognitive-complexity - re-enable after refactoring
 #   readability-identifier-length - I like my 2 letter names vars
 #   avoid-do-while - I like my do-whiles
-#   -cppcoreguidelines-avoid-do-while - I like my do-whiles
+#   cppcoreguidelines-avoid-do-while - I like my do-whiles
 #   modernize-use-trailing-return-type - leading return type is the dominant industry style
 #     (LLVM, Chromium, Google); trailing stays where it is required (return type
 #     depends on parameters)
@@ -75,3 +75,6 @@ CheckOptions:
   readability-identifier-naming.PrivateMemberPrefix: '_'
   readability-identifier-naming.GlobalConstantCase: UPPER_CASE
   readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
+  # A record whose members are all public is a struct on purpose (server::client); the check
+  # keeps firing on classes that mix public data with logic.
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
