@@ -121,6 +121,7 @@ void server::serve() {
                   ev.data.fd = _server_fd.native_handle();
                   if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
                     std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+                    std::abort();
                   }
                 }
               } else {
@@ -211,7 +212,7 @@ ssize_t server::send_output(int client_fd) {
         ev.data.fd = client_fd;
         if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
           std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
-          std::exit(EXIT_FAILURE);
+          std::abort();
         }
       }
       return bytes_send;
@@ -224,7 +225,7 @@ ssize_t server::send_output(int client_fd) {
       ev.data.fd = client_fd;
       if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, client_fd, &ev) != 0) {
         std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: client_fd");
-        std::exit(EXIT_FAILURE);
+        std::abort();
       }
     }
     return bytes_send;
@@ -239,6 +240,7 @@ void server::close_client(int client_fd) {
   ev.data.fd = _server_fd.native_handle();
   if (epoll_ctl(_epoll_fd.native_handle(), EPOLL_CTL_MOD, _server_fd.native_handle(), &ev) != 0) {
     std::perror("epoll_ctl: _epoll_fd: EPOLL_CTL_MOD: _server_fd");
+    std::abort();
   }
 }
 
