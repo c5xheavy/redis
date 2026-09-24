@@ -89,7 +89,7 @@ void server::serve() {
     } while (nfds < 0 && errno == EINTR);
     if (nfds < 0) {
       std::perror("epoll_wait: _epoll_fd");
-      std::exit(EXIT_FAILURE);
+      std::abort();
     }
 
     assert(nfds >= 0);
