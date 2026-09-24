@@ -10,7 +10,6 @@
 # so one defect can be reported under several names.
 #
 # Per-check opt-outs (each with a reason):
-#   concurrency-mt-unsafe - fires on every exit(); re-enable when I/O threads appear
 #   readability-function-cognitive-complexity - re-enable after refactoring
 #   readability-identifier-length - I like my 2 letter names vars
 #   avoid-do-while - I like my do-whiles
@@ -37,7 +36,6 @@ Checks: >
   -mpi-*,
   -openmp-*,
   -linuxkernel-*,
-  -concurrency-mt-unsafe,
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
   -avoid-do-while,
